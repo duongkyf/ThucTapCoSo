@@ -246,7 +246,7 @@ const Services = ({ flight, onBack, onNext }) => {
           </div>
         </div>
 
-        {/* ── Right: sidebar — luôn hiển thị dù tab nào ── */}
+        {/* ── Right: sidebar ── */}
         <FlightSidebar
           flight={flight}
           cls={cls}

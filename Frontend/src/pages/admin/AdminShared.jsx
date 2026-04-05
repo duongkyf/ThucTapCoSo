@@ -58,27 +58,27 @@ export function useAdminCrud(service, fetchFn, idKey = 'id') {
 
 // ─── STATUS_CLASS ─────────────────────────────────────────────
 export const STATUS_CLASS = {
-  // ✅ Green
+  //  Green
   'On Time':        'badge-success',
   'Active':         'badge-success',
   'active':         'badge-success',
   'Success':        'badge-success',
   'Confirmed':      'badge-success',
   'Checked In':     'badge-success',
-  // ✅ Vietnamese aliases
+  //  Vietnamese aliases
   'Thành công':     'badge-success',
   'Đã xác nhận':    'badge-success',
   'Đã check-in':    'badge-success',
   'Đang hoạt động': 'badge-success',
-  // 🟡 Yellow
+  //  Yellow
   'Delayed':        'badge-warning',
   'Pending':        'badge-warning',
   'Maintenance':    'badge-warning',
   'Chờ xử lý':     'badge-warning',
   'Bảo trì':        'badge-warning',
-  // 🟠 Orange
+  //  Orange
   'Chờ hủy':        'badge-orange',
-  // 🔴 Red
+  //  Red
   'Cancelled':      'badge-danger',
   'Inactive':       'badge-danger',
   'inactive':       'badge-danger',
@@ -91,17 +91,12 @@ export const STATUS_CLASS = {
 
 // ─── helpers ──────────────────────────────────────────────────
 
-/** Lấy value đầu tiên của options (string hoặc {value, label}) */
 const firstOptionValue = (options = []) => {
   if (!options.length) return '';
   const first = options[0];
   return typeof first === 'object' ? first.value : first;
 };
 
-/**
- * Xác định xem một select có cần ép kiểu Number không.
- * Dựa vào value của option đầu tiên: nếu là số thì ép kiểu.
- */
 const isNumericSelect = (options = []) => {
   const val = firstOptionValue(options);
   return val !== '' && !isNaN(Number(val));
@@ -208,11 +203,9 @@ export const AdminModal = ({ isOpen, item, fields, onClose, onSave, saving, apiE
 
   if (!isOpen) return null;
 
-  // Khi field cha (dependsOn) thay đổi → reset field con về option đầu tiên mới
   const handleChange = (key, value, field) => {
     setForm((prev) => {
       const next = { ...prev, [key]: value };
-      // Reset các field phụ thuộc vào field vừa đổi
       fields.forEach((f) => {
         if (f.dependsOn === key) {
           const depOpts = typeof f.options === 'function' ? f.options(value) : f.options;
@@ -226,7 +219,6 @@ export const AdminModal = ({ isOpen, item, fields, onClose, onSave, saving, apiE
   const handleSubmit = () => {
     const parsed = { ...form };
     fields.forEach(({ key, type, options, dependsOn }) => {
-      // Resolve options (có thể là function với dependsOn)
       const resolvedOpts = typeof options === 'function'
         ? options(form[dependsOn])
         : options;
@@ -265,7 +257,6 @@ export const AdminModal = ({ isOpen, item, fields, onClose, onSave, saving, apiE
 
           {fields.map((field) => {
             const { key, label, type = 'text', options, dependsOn } = field;
-            // Nếu options là function (dependent select), gọi với giá trị của field cha
             const resolvedOpts = typeof options === 'function'
               ? options(form[dependsOn])
               : options;

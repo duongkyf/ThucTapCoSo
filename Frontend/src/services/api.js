@@ -12,14 +12,13 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Global response error handler — chỉ xóa token, KHÔNG redirect
+// Global response error handler 
 api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401) {
       localStorage.removeItem('skybooker_token');
       localStorage.removeItem('skybooker_user');
-      // Không redirect — để từng trang tự xử lý
     }
     return Promise.reject(err);
   }

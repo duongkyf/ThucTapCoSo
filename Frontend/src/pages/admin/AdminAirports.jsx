@@ -79,7 +79,6 @@ const AdminAirports = () => {
     {
       key: 'city', label: 'Thành phố', type: 'select',
       dependsOn: 'country',
-      // options là function: nhận country hiện tại → trả về danh sách thành phố
       options: (country) =>
         (CITY_BY_COUNTRY[country] || ALL_CITIES).map(c => ({ value: c, label: c })),
     },

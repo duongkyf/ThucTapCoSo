@@ -17,7 +17,6 @@ export const useAuth = () => {
   const [error,   setError]   = useState('');
 
   // ── Tự động refresh user từ server khi app khởi động ─────────
-  // Đảm bảo dữ liệu (id_number, phone_number...) luôn mới nhất
   useEffect(() => {
     const token = localStorage.getItem(TOKEN_KEY);
     if (!token) return; // chưa đăng nhập → bỏ qua
@@ -36,7 +35,7 @@ export const useAuth = () => {
         localStorage.removeItem(TOKEN_KEY);
         setUser(null);
       });
-  }, []); // chỉ chạy 1 lần khi mount
+  }, []); 
 
   // Sync user to localStorage mỗi khi thay đổi
   useEffect(() => {

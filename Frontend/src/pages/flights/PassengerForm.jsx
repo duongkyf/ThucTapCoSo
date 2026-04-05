@@ -231,10 +231,9 @@ const PassengerForm = ({ flight, onBack, onNext, user }) => {
 
   const [forms, setForms] = useState(buildInitial);
 
-  // Reset forms khi số hành khách thay đổi
   useEffect(() => {
     setForms(buildInitial());
-  }, [adult, child, infant, user?.user_id]); // eslint-disable-line
+  }, [adult, child, infant, user?.user_id]);
 
   const handleChange = (idx, field, value) =>
     setForms((prev) => prev.map((f, i) => i === idx ? { ...f, [field]: value } : f));

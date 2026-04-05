@@ -9,7 +9,7 @@ const STATUS_CLASS = {
   'Thành công': 'success',
   'Chờ xử lý': 'pending',
   'Đã hủy':    'cancelled',
-  'Chờ hủy':   'cancelling',   // trạng thái mới: đang chờ admin duyệt hủy
+  'Chờ hủy':   'cancelling',  
 };
 
 // ─── CancelModal ──────────────────────────────────────────────
@@ -149,7 +149,7 @@ const BookingHistory = ({ user, onOpenAuth }) => {
   const [bookings,       setBookings]       = useState([]);
   const [loading,        setLoading]        = useState(true);
   const [error,          setError]          = useState('');
-  const [cancelTarget,   setCancelTarget]   = useState(null); // booking đang muốn hủy
+  const [cancelTarget,   setCancelTarget]   = useState(null);
 
   useEffect(() => {
     if (!user) { setLoading(false); }
@@ -167,8 +167,7 @@ const BookingHistory = ({ user, onOpenAuth }) => {
   }, []);
 
   useEffect(() => { load(); }, [load]);
-
-  // Gửi yêu cầu hủy kèm lý do → đổi status thành "Chờ hủy"
+  
   const handleConfirmCancel = useCallback(async (reason) => {
     const booking = cancelTarget;
     setCancelTarget(null);

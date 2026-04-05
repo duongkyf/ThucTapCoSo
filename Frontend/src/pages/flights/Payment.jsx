@@ -5,8 +5,8 @@ import '../../style/Payment.css';
 const formatMoney = (amount) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
 
-const MY_QR_MOMO  = '/qr-momo.jpg';   // đặt file vào client/public/qr-momo.png
-const MY_QR_BANK  = '/qr-bank.jpg';   // đặt file vào client/public/qr-bank.png
+const MY_QR_MOMO  = '/qr-momo.jpg';   
+const MY_QR_BANK  = '/qr-bank.jpg';  
 const QR_FALLBACK = 'https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg';
 
 const PAYMENT_METHODS = [
