@@ -1,0 +1,568 @@
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+/* ── Variables ───────────────────────────────────────────── */
+:root {
+  --navy:      #0b1120;
+  --navy-2:    #131d30;
+  --navy-3:    #1c2b47;
+  --blue:      #1a56db;
+  --blue-l:    #3b76f6;
+  --sky:       #e0eaff;
+  --accent:    #f97316;
+  --white:     #ffffff;
+  --gray-1:    #f1f5fd;
+  --gray-2:    #e2e8f0;
+  --gray-3:    #94a3b8;
+  --gray-4:    #64748b;
+  --text:      #0f172a;
+  --radius:    14px;
+  --shadow:    0 4px 24px rgba(11,17,32,.07);
+  --shadow-lg: 0 12px 40px rgba(11,17,32,.12);
+}
+
+/* ── Page ────────────────────────────────────────────────── */
+.history-page {
+  max-width: 860px;
+  margin: 48px auto;
+  padding: 0 20px 80px;
+  font-family: 'Sora', sans-serif;
+}
+
+/* ── Header ──────────────────────────────────────────────── */
+.history-header {
+  margin-bottom: 36px;
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  border-bottom: 2px solid var(--gray-2);
+  padding-bottom: 20px;
+}
+
+.history-header h1 {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -.4px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.history-header h1 .fas {
+  color: var(--blue);
+  font-size: 22px;
+}
+
+.history-header p {
+  font-size: 13px;
+  color: var(--gray-3);
+  font-weight: 500;
+  margin: 0;
+  background: var(--sky);
+  padding: 3px 11px;
+  border-radius: 20px;
+  color: var(--blue);
+}
+
+/* ── Bookings list ───────────────────────────────────────── */
+.bookings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* ── Card ────────────────────────────────────────────────── */
+.booking-history-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  border: 1.5px solid var(--gray-2);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  transition: box-shadow .22s, border-color .22s, transform .18s;
+}
+
+.booking-history-card:hover {
+  box-shadow: var(--shadow-lg);
+  border-color: #b8cdf8;
+  transform: translateY(-2px);
+}
+
+/* Header */
+.bh-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 13px 22px;
+  background: var(--navy);
+  position: relative;
+  overflow: hidden;
+}
+
+.bh-header::after {
+  content: '✈';
+  position: absolute;
+  right: 72px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 64px;
+  color: rgba(255,255,255,.04);
+  pointer-events: none;
+  font-family: sans-serif;
+}
+
+.bh-pnr {
+  font-size: 11px;
+  color: rgba(255,255,255,.5);
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.bh-pnr strong {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 15px;
+  color: #fff;
+  letter-spacing: 2px;
+  margin-left: 6px;
+}
+
+/* Status badges */
+.bh-status {
+  padding: 4px 13px;
+  border-radius: 30px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+}
+
+.badge-success   { background: rgba(16,185,129,.15); color: #10b981; border: 1px solid rgba(16,185,129,.3); }
+.badge-pending   { background: rgba(245,158,11,.15);  color: #f59e0b;  border: 1px solid rgba(245,158,11,.3); }
+.badge-cancelled { background: rgba(239,68,68,.15);   color: #ef4444;  border: 1px solid rgba(239,68,68,.3); }
+
+/* Body */
+.bh-body { padding: 22px 22px 18px; }
+
+/* Route */
+.bh-route {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.bh-point { flex: 0 0 auto; }
+
+.bh-iata {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 1px;
+  line-height: 1;
+}
+
+.bh-city {
+  font-size: 12px;
+  color: var(--gray-4);
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+/* Arrow / flight line */
+.bh-arrow {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  position: relative;
+  padding: 0 12px;
+}
+
+.bh-arrow::before {
+  content: '';
+  position: absolute;
+  top: 11px;
+  left: 0; right: 0;
+  height: 1px;
+  background: repeating-linear-gradient(
+    90deg, var(--gray-2) 0, var(--gray-2) 6px, transparent 6px, transparent 12px
+  );
+}
+
+.bh-arrow .fas {
+  background: var(--white);
+  padding: 0 8px;
+  z-index: 1;
+  color: var(--blue);
+  font-size: 16px;
+  position: relative;
+}
+
+.bh-arrow span {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--gray-3);
+  background: var(--white);
+  padding: 0 4px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Meta row */
+.bh-meta {
+  display: flex;
+  gap: 22px;
+  flex-wrap: wrap;
+}
+
+.bh-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--gray-4);
+}
+
+.bh-meta-item .fas {
+  font-size: 13px;
+  color: var(--blue-l);
+  width: 16px;
+  text-align: center;
+}
+
+/* Footer */
+.bh-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 22px;
+  background: var(--gray-1);
+  border-top: 1px solid var(--gray-2);
+}
+
+.bh-total {
+  font-size: 14px;
+  color: var(--gray-4);
+  font-weight: 500;
+}
+
+.bh-total strong {
+  font-size: 19px;
+  color: var(--accent);
+  font-weight: 700;
+  margin-left: 4px;
+}
+
+/* Cancel button */
+.btn-cancel-booking {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 18px;
+  background: var(--white);
+  border: 1.5px solid #fca5a5;
+  color: #ef4444;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'Sora', sans-serif;
+  transition: background .18s, border-color .18s, transform .15s;
+}
+
+.btn-cancel-booking:hover {
+  background: #fef2f2;
+  border-color: #ef4444;
+  transform: scale(1.02);
+}
+
+/* ── Empty state ─────────────────────────────────────────── */
+.no-bookings {
+  text-align: center;
+  padding: 80px 20px;
+  background: var(--white);
+  border-radius: var(--radius);
+  border: 1.5px dashed var(--gray-2);
+}
+
+.no-bookings h3 {
+  font-size: 20px;
+  color: var(--text);
+  margin: 18px 0 8px;
+  font-weight: 700;
+}
+
+.no-bookings p {
+  color: var(--gray-4);
+  font-size: 14px;
+  margin: 0;
+}
+
+/* ── Login / Loading / Error states ─────────────────────── */
+.history-page > div[style*="text-align: center"] {
+  background: var(--white);
+  border-radius: var(--radius);
+  border: 1.5px solid var(--gray-2);
+  box-shadow: var(--shadow);
+}
+
+/* Thêm vào Admin.css */
+
+/* ── Badge: Chờ hủy ─────────────────────────────────────── */
+.badge-cancelling {
+  background: rgba(249, 115, 22, .12);
+  color: #f97316;
+  border: 1px solid rgba(249, 115, 22, .3);
+}
+
+/* ── Highlight row đang chờ hủy ──────────────────────────── */
+tr.row-highlight-warning td {
+  background: #fffbf5;
+}
+
+tr.row-highlight-warning:hover td {
+  background: #fff7ed;
+}
+
+/* ══════════════════════════════════════════════════════════
+   BookingHistory modal
+══════════════════════════════════════════════════════════ */
+.bh-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 17, 32, .55);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.bh-modal-box {
+  background: #fff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 460px;
+  box-shadow: 0 24px 64px rgba(11, 17, 32, .22);
+  overflow: hidden;
+  animation: bh-modal-in .2s ease;
+}
+
+@keyframes bh-modal-in {
+  from { opacity: 0; transform: scale(.96) translateY(10px); }
+  to   { opacity: 1; transform: scale(1)  translateY(0); }
+}
+
+/* Modal header */
+.bh-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 22px;
+  background: #0b1120;
+  color: #fff;
+}
+
+.bh-modal-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(239, 68, 68, .15);
+  border: 1px solid rgba(239, 68, 68, .3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #f87171;
+  flex-shrink: 0;
+}
+
+.bh-modal-header h3 {
+  margin: 0 0 2px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.bh-modal-header p {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(255,255,255,.55);
+}
+
+.bh-modal-close {
+  margin-left: auto;
+  background: rgba(255,255,255,.1);
+  border: none;
+  color: rgba(255,255,255,.7);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition: background .15s;
+  flex-shrink: 0;
+}
+
+.bh-modal-close:hover { background: rgba(255,255,255,.18); color: #fff; }
+
+/* Modal body */
+.bh-modal-body {
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.bh-modal-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 13.5px;
+  color: #0369a1;
+  line-height: 1.5;
+}
+
+.bh-modal-warning .fas { margin-top: 1px; flex-shrink: 0; }
+
+.bh-modal-field { display: flex; flex-direction: column; gap: 6px; }
+
+.bh-modal-field label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.bh-modal-field textarea {
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 13px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  color: #1e293b;
+  transition: border-color .15s;
+  outline: none;
+}
+
+.bh-modal-field textarea:focus   { border-color: #3b82f6; }
+.bh-modal-field textarea.has-error { border-color: #ef4444; background: #fef2f2; }
+
+.bh-modal-err {
+  font-size: 12.5px;
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.required { color: #ef4444; }
+
+/* Modal footer */
+.bh-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 22px;
+  border-top: 1px solid #f1f5f9;
+  background: #f8fafc;
+}
+
+.bh-btn-back {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  color: #64748b;
+  border-radius: 9px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.bh-btn-back:hover { background: #f1f5f9; border-color: #cbd5e1; }
+
+.bh-btn-submit {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 20px;
+  background: #1a56db;
+  border: none;
+  color: #fff;
+  border-radius: 9px;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .15s, transform .12s;
+}
+
+.bh-btn-submit:hover { background: #1d4ed8; transform: scale(1.02); }
+
+/* ── Cancelling state trong card ─────────────────────────── */
+.booking-history-card.cancelling {
+  border-color: #fed7aa;
+}
+
+.bh-cancelling-notice {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 14px;
+  padding: 10px 14px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 9px;
+  font-size: 13px;
+  color: #c2410c;
+  font-weight: 500;
+}
+
+.bh-cancelling-notice .fas { color: #f97316; }
+
+/* ── Empty / login state ─────────────────────────────────── */
+.bh-empty-state {
+  text-align: center;
+  padding: 80px 20px;
+  background: #fff;
+  border-radius: 14px;
+  border: 1.5px solid #e2e8f0;
+  box-shadow: 0 4px 24px rgba(11,17,32,.06);
+}
+
+.bh-empty-state .fas { font-size: 48px; display: block; margin-bottom: 16px; color: #cbd5e1; }
+.bh-empty-state h3   { font-size: 20px; color: #1e293b; margin: 0 0 8px; font-weight: 700; }
+.bh-empty-state p    { color: #64748b; font-size: 14px; margin: 0 0 24px; }
+
+.bh-btn-login {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #1a56db;
+  color: #fff;
+  border: none;
+  padding: 12px 28px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .18s;
+}
+
+.bh-btn-login:hover { background: #1d4ed8; }

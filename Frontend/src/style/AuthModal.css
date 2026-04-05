@@ -1,0 +1,179 @@
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
+
+/* ── Overlay ──────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 22, 40, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+}
+
+/* ── Card ─────────────────────────────────────────────────── */
+.auth-card {
+  background: #fff;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 400px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.2);
+  animation: authSlideUp 0.25s cubic-bezier(0.16,1,0.3,1) forwards;
+  position: relative;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  padding: 36px 32px 28px;
+}
+
+@keyframes authSlideUp {
+  from { opacity: 0; transform: translateY(20px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)  scale(1); }
+}
+
+/* ── Header text (no background) ─────────────────────────── */
+.auth-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.auth-icon {
+  width: 52px; height: 52px;
+  background: #eff6ff;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 14px;
+  font-size: 20px;
+  color: #1a56db;
+}
+
+.auth-header h2 {
+  font-family: 'Be Vietnam Pro', sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 4px;
+}
+
+.auth-header p {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0;
+}
+
+/* ── Close ────────────────────────────────────────────────── */
+.close-btn {
+  position: absolute;
+  top: 14px; right: 14px;
+  width: 28px; height: 28px;
+  border: none;
+  background: #f1f5f9;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 16px;
+  color: #64748b;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.2s;
+  line-height: 1;
+  padding: 0;
+}
+.close-btn:hover { background: #e2e8f0; color: #ef4444; }
+
+/* ── Body ─────────────────────────────────────────────────── */
+.auth-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Error ────────────────────────────────────────────────── */
+.auth-error {
+  margin-bottom: 4px;
+  padding: 11px 14px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  color: #dc2626;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Fields ───────────────────────────────────────────────── */
+.auth-field { display: flex; flex-direction: column; gap: 6px; }
+
+.auth-field label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #64748b;
+}
+
+.auth-field input {
+  padding: 12px 14px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 15px;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  color: #0f172a;
+  background: #f8fafc;
+  outline: none;
+  transition: all 0.2s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.auth-field input:focus {
+  border-color: #1a56db;
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(26,86,219,0.08);
+}
+
+.auth-field input::placeholder { color: #cbd5e0; }
+
+/* ── Submit button ────────────────────────────────────────── */
+.auth-submit {
+  width: 100%;
+  padding: 14px 20px;
+  background: linear-gradient(135deg, #0a1628, #1a56db);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.22s;
+  letter-spacing: 0.2px;
+}
+
+.auth-submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(26,86,219,0.35);
+}
+
+.auth-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ── Switch ───────────────────────────────────────────────── */
+.auth-switch {
+  text-align: center;
+  padding-top: 20px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.auth-switch strong {
+  color: #1a56db;
+  cursor: pointer;
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+.auth-switch strong:hover { text-decoration: underline; }

@@ -1,0 +1,116 @@
+.success-page {
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  background: #f8fafc;
+}
+
+.success-card {
+  background: white;
+  border-radius: 16px;
+  padding: 48px 40px;
+  max-width: 520px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+}
+
+.success-icon-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.success-icon {
+  width: 72px; height: 72px;
+  background: linear-gradient(135deg, #10b981, #059669);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 32px;
+  color: white;
+  box-shadow: 0 4px 16px rgba(16,185,129,0.35);
+}
+
+.success-card h2 {
+  font-size: 24px;
+  color: #0f172a;
+  margin: 0 0 8px;
+}
+
+.success-sub {
+  color: #64748b;
+  font-size: 14px;
+  margin: 0 0 28px;
+}
+
+.success-info-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+  text-align: left;
+}
+
+.success-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 14px;
+}
+
+.success-row:last-child { border-bottom: none; }
+.success-row span { color: #64748b; }
+.success-row strong { color: #1e293b; }
+.success-row.total strong { font-size: 16px; }
+
+.pnr-code {
+  font-size: 18px !important;
+  color: #1d4ed8 !important;
+  letter-spacing: 2px;
+  font-family: monospace;
+}
+
+.success-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 28px;
+  text-align: left;
+}
+
+.success-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: #475569;
+  background: #f0fdf4;
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.success-step i { color: #10b981; font-size: 16px; width: 20px; text-align: center; }
+
+.btn-home {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, #1d4ed8, #2563eb);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-home:hover { opacity: 0.9; }

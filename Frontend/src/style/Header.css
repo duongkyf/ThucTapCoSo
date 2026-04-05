@@ -1,0 +1,217 @@
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
+
+/* ── Header shell ─────────────────────────────────────────── */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 40px;
+  height: 64px;
+  background: #fff;
+  border-bottom: 1px solid #e8ecf4;
+  box-shadow: 0 1px 12px rgba(0,0,0,0.05);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  font-family: 'Be Vietnam Pro', sans-serif;
+}
+
+/* ── Logo ─────────────────────────────────────────────────── */
+.logo {
+  font-family: 'Be Vietnam Pro', sans-serif;
+  font-weight: 800;
+  font-size: 20px;
+  color: #0a1628;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: -0.3px;
+  user-select: none;
+}
+
+.logo i { color: #1a56db; font-size: 18px; }
+
+/* ── Nav ──────────────────────────────────────────────────── */
+.nav-links { display: flex; align-items: center; gap: 4px; }
+
+.nav-links a {
+  padding: 7px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #475569;
+  text-decoration: none;
+  border-radius: 8px;
+  transition: all 0.18s;
+}
+
+.nav-links a:hover {
+  color: #1a56db;
+  background: #eff6ff;
+}
+
+/* ── User area ────────────────────────────────────────────── */
+.user-info-container { position: relative; }
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 40px;
+  cursor: pointer;
+  border: 1.5px solid #e2e8f0;
+  background: #f8fafc;
+  transition: all 0.2s;
+  user-select: none;
+}
+
+.user-info:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+/* Avatar initials */
+.user-avatar-initials {
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  flex-shrink: 0;
+  letter-spacing: 0.5px;
+}
+
+.user-avatar-initials.guest {
+  background: #cbd5e0;
+  color: #64748b;
+  font-size: 14px !important;
+}
+
+/* Avatar image */
+.user-avatar {
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.user-name-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.icon-arrow {
+  font-size: 11px;
+  color: #94a3b8;
+  transition: transform 0.2s;
+}
+.icon-arrow.rotated { transform: rotate(180deg); }
+
+/* ── Dropdown ─────────────────────────────────────────────── */
+.user-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  width: 240px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+  overflow: hidden;
+  animation: dropDown 0.18s cubic-bezier(0.16,1,0.3,1) forwards;
+  z-index: 999;
+}
+
+@keyframes dropDown {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.dropdown-header {
+  padding: 16px;
+  background: linear-gradient(135deg, #0a1628, #1e3a6e);
+}
+
+.dropdown-avatar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dropdown-avatar-wrap .dropdown-user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.dropdown-avatar-wrap strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dropdown-avatar-wrap small {
+  font-size: 11px;
+  color: #93c5fd;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: #f1f5f9;
+  margin: 4px 0;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  color: #334155;
+  text-decoration: none;
+  border: none;
+  background: none;
+  width: 100%;
+  cursor: pointer;
+  transition: background 0.15s;
+  text-align: left;
+}
+
+.dropdown-item i {
+  width: 16px;
+  text-align: center;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.dropdown-item:hover {
+  background: #f1f5f9;
+  color: #1a56db;
+}
+.dropdown-item:hover i { color: #1a56db; }
+
+.btn-logout-drop { color: #ef4444; }
+.btn-logout-drop i { color: #ef4444; }
+.btn-logout-drop:hover { background: #fef2f2; color: #dc2626; }
+.btn-logout-drop:hover i { color: #dc2626; }
+
+@media (max-width: 640px) {
+  header { padding: 0 16px; }
+  .user-name-text { display: none; }
+  .nav-links a { padding: 6px 10px; font-size: 13px; }
+}
