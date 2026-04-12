@@ -1,0 +1,280 @@
+/* PassengerForm.css — shared by PassengerForm, Services, Payment */
+
+.passenger-page { margin-top: 20px; }
+
+.page-title {
+  font-size: 24px;
+  color: #1a202c;
+  margin-bottom: 20px;
+}
+
+/* ── Two-column layout ───────────────────────────────────── */
+.layout-with-sidebar {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 24px;
+  align-items: start;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 960px) {
+  .layout-with-sidebar { grid-template-columns: 1fr; }
+}
+
+/* ── Passenger card ──────────────────────────────────────── */
+.passenger-card {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  padding: 25px;
+  margin-bottom: 25px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+}
+
+.pax-card-header {
+  font-size: 18px;
+  font-weight: bold;
+  color: #2d3748;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #edf2f7;
+  padding-bottom: 15px;
+}
+
+.pax-card-header span {
+  font-weight: normal;
+  color: #718096;
+  font-size: 14px;
+}
+
+/* ── Form grid ───────────────────────────────────────────── */
+.pax-form-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.pax-form-grid .form-group {
+  flex: 1 1 calc(33.333% - 14px);
+  min-width: 200px;
+}
+
+.form-group.full-width { flex: 1 1 100%; }
+
+.form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a5568;
+  margin-bottom: 8px;
+}
+
+.form-input {
+  width: 100%;
+  padding: 12px 15px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #2d3748;
+  outline: none;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.form-input:focus {
+  border-color: #3182ce;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+}
+
+/* ── Extra options ───────────────────────────────────────── */
+.extra-options-card {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  padding: 20px;
+  margin-bottom: 25px;
+}
+
+.checkbox-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-size: 14px;
+  color: #4a5568;
+  cursor: pointer;
+}
+
+.warning-note {
+  margin-top: 15px;
+  padding: 15px;
+  background: #fffaf0;
+  border: 1px solid #feebc8;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #c05621;
+}
+
+.warning-note a {
+  color: #dd6b20;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ── Action buttons ──────────────────────────────────────── */
+.action-buttons { display: flex; gap: 15px; }
+
+.btn-back {
+  flex: 1;
+  padding: 15px;
+  background: white;
+  border: 1px solid #cbd5e0;
+  border-radius: 8px;
+  font-weight: bold;
+  color: #4a5568;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-back:hover { background: #f8fafc; }
+
+.btn-continue {
+  flex: 2;
+  padding: 15px;
+  background: #1a56db;
+  border: none;
+  border-radius: 8px;
+  font-weight: bold;
+  color: white;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-continue:hover { background: #1e40af; }
+
+/* ── Summary sidebar ─────────────────────────────────────── */
+.form-sections {
+  min-width: 0;
+}
+
+.flight-summary-sidebar {
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e2e8f0;
+  position: sticky;
+  top: 90px;
+}
+
+.summary-header {
+  background: linear-gradient(135deg, #1a56db 0%, #1e40af 100%);
+  color: white;
+  padding: 16px 20px;
+  font-weight: bold;
+  font-size: 15px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  border-radius: 16px 16px 0 0;
+}
+
+.summary-body { padding: 20px; }
+
+.route-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.route-point h3    { font-size: 24px; margin: 0; color: #1a202c; }
+.route-point p     { font-size: 12px; color: #718096; margin: 5px 0; }
+.route-point.right { text-align: right; }
+.route-icon        { color: #93c5fd; font-size: 20px; }
+
+.flight-details { font-size: 13px; color: #4a5568; line-height: 1.6; }
+
+.divider { height: 1px; background: #edf2f7; margin: 15px 0; }
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 14px;
+  color: #4a5568;
+}
+
+.badge-class {
+  background: #1a202c;
+  color: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.total-price {
+  font-size: 16px;
+  font-weight: bold;
+  margin-top: 15px;
+  border-top: 1px solid #edf2f7;
+  padding-top: 15px;
+}
+
+.text-primary { color: #1a56db; font-size: 20px; }
+
+.flight-route-section { margin-bottom: 15px; }
+
+.route-badge {
+  display: inline-block;
+  background: #ebf8ff;
+  color: #3182ce;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.route-badge.return { background: #fff5f5; color: #e53e3e; }
+
+/* Prefill notice */
+.prefill-notice {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #1d4ed8;
+  margin-bottom: 4px;
+}
+.prefill-notice i { margin-right: 6px; }
+
+/* ── Passenger type notice ───────────────────────────────── */
+.pax-type-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  margin-bottom: 4px;
+}
+.pax-type-notice i { font-size: 16px; flex-shrink: 0; }
+
+.pax-type-notice.child {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+}
+.pax-type-notice.child i { color: #2563eb; }
+
+.pax-type-notice.infant {
+  background: #fdf4ff;
+  border: 1px solid #e9d5ff;
+  color: #7c3aed;
+}
+.pax-type-notice.infant i { color: #8b5cf6; }
