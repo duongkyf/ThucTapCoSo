@@ -13,7 +13,7 @@ import './App.css';
 
 // ─── Route guards ─────────────────────────────────────────────
 const AdminRoute   = ({ user, children }) =>
-  user?.role === 'admin' ? children : <Navigate to="/" replace />;
+  user?.role === 'SUPER_ADMIN' || user?.role === 'AIRLINE_ADMIN' ? children : <Navigate to="/" replace />;
 
 const PrivateRoute = ({ user, children }) =>
   user ? children : <Navigate to="/" replace />;
@@ -26,7 +26,7 @@ const AppContent = () => {
 
   // Navigate dựa trên user role sau khi login/logout
   useEffect(() => {
-    if (user?.role === 'admin') {
+    if (user?.role === 'SUPER_ADMIN' || user?.role === 'AIRLINE_ADMIN') {
       navigate('/admin', { replace: true });
     }
   }, [user]);  // eslint-disable-line
@@ -54,7 +54,7 @@ const AppContent = () => {
     navigate('/', { replace: true });
   }, [logout, navigate]);
 
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'AIRLINE_ADMIN';
 
   return (
     <div className="app-wrapper">

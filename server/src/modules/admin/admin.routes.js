@@ -1,52 +1,68 @@
 const { Router } = require('express');
-const { authenticate, authorizeRoles } = require('../../middleware/auth');
-const ctrl = require('./admin.controller');
+const {
+  authenticate,
+  requireRole,
+  requireAirlineAccess,
+  isSuperAdmin,
+  isAnyAdmin,
+} = require('../../middleware/auth');
+const ctrl   = require('./admin.controller');
+const router = Router();
 
-const router  = Router();
-const isAdmin = [authenticate, authorizeRoles('admin')];
+// Middleware cục bộ cho AIRLINE_ADMIN only
+const isAirlineAdmin = [authenticate, requireRole('AIRLINE_ADMIN')];
 
-// GET /api/admin/stats
-router.get('/stats', isAdmin, ctrl.getStats);
+// ── Stats ─────────────────────────────────────────────────────
+// Cả 2 role đều gọi, controller tự filter theo role
+router.get('/stats', isAnyAdmin, ctrl.getStats);
 
 // ── Flights ───────────────────────────────────────────────────
-router.get   ('/flights',     isAdmin, ctrl.getFlights);
-router.post  ('/flights',     isAdmin, ctrl.createFlight);
-router.put   ('/flights/:id', isAdmin, ctrl.updateFlight);
-router.delete('/flights/:id', isAdmin, ctrl.deleteFlight);
+// CHỈ AIRLINE_ADMIN
+router.get   ('/flights',     isAirlineAdmin,                                ctrl.getFlights);
+router.post  ('/flights',     [...isAirlineAdmin, requireAirlineAccess],     ctrl.createFlight);
+router.put   ('/flights/:id', [...isAirlineAdmin, requireAirlineAccess],     ctrl.updateFlight);
+router.delete('/flights/:id', [...isAirlineAdmin, requireAirlineAccess],     ctrl.deleteFlight);
 
 // ── Aircrafts ─────────────────────────────────────────────────
-router.get   ('/aircrafts',     isAdmin, ctrl.getAircrafts);
-router.post  ('/aircrafts',     isAdmin, ctrl.createAircraft);
-router.put   ('/aircrafts/:id', isAdmin, ctrl.updateAircraft);
-router.delete('/aircrafts/:id', isAdmin, ctrl.deleteAircraft);
-
-// ── Airports ──────────────────────────────────────────────────
-router.get   ('/airports',     isAdmin, ctrl.getAirports);
-router.post  ('/airports',     isAdmin, ctrl.createAirport);
-router.put   ('/airports/:id', isAdmin, ctrl.updateAirport);
-router.delete('/airports/:id', isAdmin, ctrl.deleteAirport);
+// CHỈ AIRLINE_ADMIN
+router.get   ('/aircrafts',     isAirlineAdmin,                              ctrl.getAircrafts);
+router.post  ('/aircrafts',     [...isAirlineAdmin, requireAirlineAccess],   ctrl.createAircraft);
+router.put   ('/aircrafts/:id', [...isAirlineAdmin, requireAirlineAccess],   ctrl.updateAircraft);
+router.delete('/aircrafts/:id', [...isAirlineAdmin, requireAirlineAccess],   ctrl.deleteAircraft);
 
 // ── Services ──────────────────────────────────────────────────
-router.get   ('/services',     isAdmin, ctrl.getServices);
-router.post  ('/services',     isAdmin, ctrl.createService);
-router.put   ('/services/:id', isAdmin, ctrl.updateService);
-router.delete('/services/:id', isAdmin, ctrl.deleteService);
+// CHỈ AIRLINE_ADMIN
+router.get   ('/services',     isAirlineAdmin, ctrl.getServices);
+router.post  ('/services',     isAirlineAdmin, ctrl.createService);
+router.put   ('/services/:id', isAirlineAdmin, ctrl.updateService);
+router.delete('/services/:id', isAirlineAdmin, ctrl.deleteService);
 
 // ── Bookings ──────────────────────────────────────────────────
-router.get   ('/bookings',                    isAdmin, ctrl.getBookings);
-router.patch ('/bookings/:id/approve-cancel', isAdmin, ctrl.approveCancel); // duyệt yêu cầu hủy
-router.patch ('/bookings/:id/reject-cancel',  isAdmin, ctrl.rejectCancel);  // từ chối yêu cầu hủy
-router.delete('/bookings/:id',                isAdmin, ctrl.deleteBooking);  // soft delete
+// CHỈ AIRLINE_ADMIN (xem/duyệt/từ chối hủy của chuyến bay hãng mình)
+router.get   ('/bookings',                    isAirlineAdmin, ctrl.getBookings);
+router.patch ('/bookings/:id/approve-cancel', isAirlineAdmin, ctrl.approveCancel);
+router.patch ('/bookings/:id/reject-cancel',  isAirlineAdmin, ctrl.rejectCancel);
+router.delete('/bookings/:id',                isSuperAdmin,   ctrl.deleteBooking); // xóa hẳn: chỉ SUPER_ADMIN
+
+// ── Airports ──────────────────────────────────────────────────
+// CHỈ SUPER_ADMIN
+router.get   ('/airports',     isSuperAdmin, ctrl.getAirports);
+router.post  ('/airports',     isSuperAdmin, ctrl.createAirport);
+router.put   ('/airports/:id', isSuperAdmin, ctrl.updateAirport);
+router.delete('/airports/:id', isSuperAdmin, ctrl.deleteAirport);
 
 // ── Airlines ──────────────────────────────────────────────────
-router.get   ('/airlines',     isAdmin, ctrl.getAirlines);
-router.post  ('/airlines',     isAdmin, ctrl.createAirline);
-router.put   ('/airlines/:id', isAdmin, ctrl.updateAirline);
-router.delete('/airlines/:id', isAdmin, ctrl.deleteAirline);
+// CHỈ SUPER_ADMIN (tạo/sửa/xóa)
+// Đọc: cả 2 role (AIRLINE_ADMIN cần xem thông tin hãng mình)
+router.get   ('/airlines',     isAnyAdmin,   ctrl.getAirlines);
+router.post  ('/airlines',     isSuperAdmin, ctrl.createAirline);
+router.put   ('/airlines/:id', isSuperAdmin, ctrl.updateAirline);
+router.delete('/airlines/:id', isSuperAdmin, ctrl.deleteAirline);
 
 // ── Customers ─────────────────────────────────────────────────
-router.get   ('/customers',           isAdmin, ctrl.getCustomers);
-router.patch ('/customers/:id/ban',   isAdmin, ctrl.banCustomer);
-router.patch ('/customers/:id/unban', isAdmin, ctrl.unbanCustomer);
+// CHỈ SUPER_ADMIN
+router.get   ('/customers',           isSuperAdmin, ctrl.getCustomers);
+router.patch ('/customers/:id/ban',   isSuperAdmin, ctrl.banCustomer);
+router.patch ('/customers/:id/unban', isSuperAdmin, ctrl.unbanCustomer);
 
 module.exports = router;

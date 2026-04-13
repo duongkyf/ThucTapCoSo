@@ -9,21 +9,25 @@ import AdminCustomers from './AdminCustomers';
 import AdminAirlines  from './AdminAirlines';
 import '../../style/Admin.css';
 
-// ─── Nav config ───────────────────────────────────────────────────────────────
-const NAV_ITEMS = [
-  { tab: 'overview',   icon: 'fa-list',            label: 'Tổng quan'       },
-  { tab: 'flights',    icon: 'fa-route',           label: 'Chuyến bay'      },
-  { tab: 'planes',     icon: 'fa-plane',           label: 'Máy bay'         },
-  { tab: 'airlines',   icon: 'fa-building',        label: 'Hãng hàng không' },
-  { tab: 'orders',     icon: 'fa-ticket-alt',      label: 'Đặt vé'          },
-  { tab: 'services',   icon: 'fa-utensils',        label: 'Dịch vụ'         },
-  { tab: 'airports',   icon: 'fa-map-marker-alt',  label: 'Sân bay'         },
-  { tab: 'customers',  icon: 'fa-users',           label: 'Tài khoản KH'    },
+const SUPER_ADMIN_NAV = [
+  { tab: 'overview',  icon: 'fa-chart-pie',      label: 'Tổng quan hệ thống' },
+  { tab: 'airlines',  icon: 'fa-building',       label: 'Hãng hàng không'    },
+  { tab: 'airports',  icon: 'fa-map-marker-alt', label: 'Sân bay'            },
+  { tab: 'customers', icon: 'fa-users',          label: 'Tài khoản KH'       },
 ];
 
-const renderPanel = (tab) => {
+const AIRLINE_ADMIN_NAV = [
+  { tab: 'overview',  icon: 'fa-chart-bar',  label: 'Tổng quan hãng' },
+  { tab: 'flights',   icon: 'fa-route',      label: 'Chuyến bay'     },
+  { tab: 'planes',    icon: 'fa-plane',      label: 'Máy bay'        },
+  { tab: 'services',  icon: 'fa-utensils',   label: 'Dịch vụ'        },
+  { tab: 'orders',    icon: 'fa-ticket-alt', label: 'Đặt vé'         },
+];
+
+// ── renderPanel nhận setTab để truyền xuống Overview ─────────
+const renderPanel = (tab, setTab) => {
   switch (tab) {
-    case 'overview':  return <AdminOverview />;
+    case 'overview':  return <AdminOverview onNavigate={setTab} />;
     case 'flights':   return <AdminFlights />;
     case 'planes':    return <AdminPlanes />;
     case 'airlines':  return <AdminAirlines />;
@@ -31,22 +35,25 @@ const renderPanel = (tab) => {
     case 'services':  return <AdminServices />;
     case 'airports':  return <AdminAirports />;
     case 'customers': return <AdminCustomers />;
-    default:          return <AdminOverview />;
+    default:          return <AdminOverview onNavigate={setTab} />;
   }
 };
 
-// ─── Component ────────────────────────────────────────────────────────────────
 const Admin = ({ user, onLogout }) => {
   const [tab, setTab] = useState('overview');
 
-  const handleLogout = useCallback(() => {
-    onLogout?.();
-  }, [onLogout]);
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+  const navItems     = isSuperAdmin ? SUPER_ADMIN_NAV : AIRLINE_ADMIN_NAV;
+  const safeTab      = navItems.find(n => n.tab === tab) ? tab : 'overview';
+
+  const handleLogout = useCallback(() => onLogout?.(), [onLogout]);
+
+  const roleLabel      = isSuperAdmin ? 'Super Admin' : 'Airline Admin';
+  const roleBadgeColor = isSuperAdmin ? '#3b82f6'     : '#f59e0b';
 
   return (
     <div className="admin-layout">
 
-      {/* ── Sidebar ──────────────────────────────── */}
       <aside className="admin-sidebar">
         <div className="admin-brand" onClick={() => setTab('overview')}>
           <i className="fas fa-plane-departure" style={{ color: '#3b82f6' }} />
@@ -55,8 +62,12 @@ const Admin = ({ user, onLogout }) => {
 
         <div className="sidebar-label">ĐIỀU HƯỚNG</div>
         <nav className="admin-nav">
-          {NAV_ITEMS.map(({ tab: t, icon, label }) => (
-            <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>
+          {navItems.map(({ tab: t, icon, label }) => (
+            <button
+              key={t}
+              className={safeTab === t ? 'active' : ''}
+              onClick={() => setTab(t)}
+            >
               <i className={`fas ${icon}`} /> {label}
             </button>
           ))}
@@ -64,7 +75,6 @@ const Admin = ({ user, onLogout }) => {
 
         <div style={{ flex: 1 }} />
 
-        {/* ── User footer ──────────────────────── */}
         <div className="sidebar-footer">
           <div className="sidebar-user">
             <img
@@ -73,7 +83,10 @@ const Admin = ({ user, onLogout }) => {
             />
             <div>
               <div className="sidebar-user-name">{user?.username || 'Quản trị viên'}</div>
-              <div className="sidebar-user-email">{user?.email || 'admin@sky.com'}</div>
+              <div style={{ fontSize: '11px', fontWeight: 600, color: roleBadgeColor, marginTop: '2px' }}>
+                {roleLabel}
+              </div>
+              <div className="sidebar-user-email">{user?.email || ''}</div>
             </div>
           </div>
           <button className="btn-logout" onClick={handleLogout}>
@@ -82,18 +95,19 @@ const Admin = ({ user, onLogout }) => {
         </div>
       </aside>
 
-      {/* ── Main content ─────────────────────────── */}
       <main className="admin-main">
         <header className="admin-topbar">
           <h1 className="topbar-title">
-            {NAV_ITEMS.find((n) => n.tab === tab)?.label || 'Tổng quan'}
+            {navItems.find(n => n.tab === safeTab)?.label || 'Tổng quan'}
           </h1>
           <span className="topbar-date">
-            {new Date().toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            {new Date().toLocaleDateString('vi-VN', {
+              weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+            })}
           </span>
         </header>
         <div className="admin-content-area">
-          {renderPanel(tab)}
+          {renderPanel(safeTab, setTab)}
         </div>
       </main>
 

@@ -1,13 +1,62 @@
 const bcrypt = require('bcryptjs');
 const { sql, getPool } = require('../../config/db');
 
+// ── Helper: kiểm tra role ─────────────────────────────────────
+const isSuperAdmin    = (req) => req.user?.role === 'SUPER_ADMIN';
+const isAirlineAdmin  = (req) => req.user?.role === 'AIRLINE_ADMIN';
+
 // ── Stats ─────────────────────────────────────────────────────
 const getStats = async (req, res) => {
   try {
     const pool = await getPool();
+
+    // AIRLINE_ADMIN chỉ thấy stats của hãng mình
+    if (isAirlineAdmin(req)) {
+      const airlineId = req.user.airline_id;
+      const result = await pool.request()
+        .input('airline_id', sql.Int, airlineId)
+        .query(`
+          SELECT
+            (SELECT COUNT(*) FROM dbo.Flights WHERE airline_id = @airline_id AND status != 'Cancelled') AS total_flights,
+            (SELECT COUNT(*) FROM dbo.Bookings b
+             JOIN dbo.Tickets t ON t.booking_id = b.booking_id
+             JOIN dbo.Flights f ON t.flight_id  = f.flight_id
+             WHERE f.airline_id = @airline_id) AS total_bookings,
+            (SELECT COUNT(*) FROM dbo.Bookings b
+             JOIN dbo.Tickets t ON t.booking_id = b.booking_id
+             JOIN dbo.Flights f ON t.flight_id  = f.flight_id
+             WHERE f.airline_id = @airline_id AND b.status = N'Thành công') AS success_bookings,
+            (SELECT COUNT(*) FROM dbo.Bookings b
+             JOIN dbo.Tickets t ON t.booking_id = b.booking_id
+             JOIN dbo.Flights f ON t.flight_id  = f.flight_id
+             WHERE f.airline_id = @airline_id AND b.status = N'Chờ xử lý') AS pending_bookings,
+            (SELECT COUNT(*) FROM dbo.Bookings b
+             JOIN dbo.Tickets t ON t.booking_id = b.booking_id
+             JOIN dbo.Flights f ON t.flight_id  = f.flight_id
+             WHERE f.airline_id = @airline_id AND b.status = N'Đã hủy') AS canceled_bookings,
+            (SELECT ISNULL(SUM(b.total_amount), 0)
+             FROM dbo.Bookings b
+             JOIN dbo.Tickets t ON t.booking_id = b.booking_id
+             JOIN dbo.Flights f ON t.flight_id  = f.flight_id
+             WHERE f.airline_id = @airline_id AND b.status = N'Thành công') AS total_revenue
+        `);
+      const d = result.recordset[0];
+      return res.json({ success: true, data: {
+        revenue:  { total: d.total_revenue },
+        users:    { total: 0, active: 0 },   // AIRLINE_ADMIN không xem users
+        bookings: {
+          total:    d.total_bookings,
+          success:  d.success_bookings,
+          pending:  d.pending_bookings,
+          canceled: d.canceled_bookings,
+        },
+      }});
+    }
+
+    // SUPER_ADMIN: xem tất cả (giữ nguyên logic cũ)
     const result = await pool.request().query(`
       SELECT
-        (SELECT COUNT(*) FROM dbo.Users    WHERE role != 'admin') AS total_customers,
+        (SELECT COUNT(*) FROM dbo.Users    WHERE role = 'USER') AS total_customers,
         (SELECT COUNT(*) FROM dbo.Flights  WHERE status != 'Cancelled') AS total_flights,
         (SELECT COUNT(*) FROM dbo.Bookings) AS total_bookings,
         (SELECT COUNT(*) FROM dbo.Bookings WHERE status = N'Thành công') AS success_bookings,
@@ -38,7 +87,16 @@ const getStats = async (req, res) => {
 const getFlights = async (req, res) => {
   try {
     const pool = await getPool();
-    const result = await pool.request().query(`
+    const request = pool.request();
+
+    // AIRLINE_ADMIN chỉ thấy chuyến bay của hãng mình
+    let whereClause = '';
+    if (isAirlineAdmin(req)) {
+      request.input('airline_id', sql.Int, req.user.airline_id);
+      whereClause = 'WHERE f.airline_id = @airline_id';
+    }
+
+    const result = await request.query(`
       SELECT f.*, a.model_name,
         src.city AS origin_city, src.airport_id AS origin_iata,
         dst.city AS dest_city,   dst.airport_id AS dest_iata,
@@ -48,6 +106,7 @@ const getFlights = async (req, res) => {
       JOIN dbo.Airports src  ON f.source_airport_id      = src.airport_id
       JOIN dbo.Airports dst  ON f.destination_airport_id = dst.airport_id
       LEFT JOIN dbo.Airlines al ON f.airline_id = al.airline_id
+      ${whereClause}
       ORDER BY f.departure_time DESC
     `);
     res.json({ success: true, data: result.recordset });
@@ -59,9 +118,15 @@ const getFlights = async (req, res) => {
 
 const createFlight = async (req, res) => {
   try {
-    const { flight_code, aircraft_id, source_airport_id, destination_airport_id,
-            departure_time, arrival_time, base_price, status, airline_id, is_recurring } = req.body;
     const pool = await getPool();
+    let { flight_code, aircraft_id, source_airport_id, destination_airport_id,
+          departure_time, arrival_time, base_price, status, airline_id, is_recurring } = req.body;
+
+    // AIRLINE_ADMIN chỉ được tạo chuyến bay cho hãng mình
+    if (isAirlineAdmin(req)) {
+      airline_id = req.user.airline_id;
+    }
+
     const result = await pool.request()
       .input('flight_code',           sql.NVarChar, flight_code)
       .input('aircraft_id',           sql.Int,      aircraft_id)
@@ -90,9 +155,23 @@ const createFlight = async (req, res) => {
 
 const updateFlight = async (req, res) => {
   try {
-    const { flight_code, aircraft_id, source_airport_id, destination_airport_id,
-            departure_time, arrival_time, base_price, status, airline_id, is_recurring } = req.body;
     const pool = await getPool();
+
+    // Kiểm tra AIRLINE_ADMIN chỉ sửa chuyến bay của hãng mình
+    if (isAirlineAdmin(req)) {
+      const check = await pool.request()
+        .input('id',         sql.Int, req.params.id)
+        .input('airline_id', sql.Int, req.user.airline_id)
+        .query(`SELECT 1 FROM dbo.Flights WHERE flight_id = @id AND airline_id = @airline_id`);
+      if (check.recordset.length === 0)
+        return res.status(403).json({ success: false, message: 'Bạn không có quyền sửa chuyến bay này' });
+    }
+
+    let { flight_code, aircraft_id, source_airport_id, destination_airport_id,
+          departure_time, arrival_time, base_price, status, airline_id, is_recurring } = req.body;
+
+    if (isAirlineAdmin(req)) airline_id = req.user.airline_id;
+
     await pool.request()
       .input('id',                    sql.Int,      req.params.id)
       .input('flight_code',           sql.NVarChar, flight_code)
@@ -124,6 +203,17 @@ const updateFlight = async (req, res) => {
 const deleteFlight = async (req, res) => {
   try {
     const pool = await getPool();
+
+    // AIRLINE_ADMIN chỉ hủy chuyến bay của hãng mình
+    if (isAirlineAdmin(req)) {
+      const check = await pool.request()
+        .input('id',         sql.Int, req.params.id)
+        .input('airline_id', sql.Int, req.user.airline_id)
+        .query(`SELECT 1 FROM dbo.Flights WHERE flight_id = @id AND airline_id = @airline_id`);
+      if (check.recordset.length === 0)
+        return res.status(403).json({ success: false, message: 'Bạn không có quyền hủy chuyến bay này' });
+    }
+
     await pool.request()
       .input('id', sql.Int, req.params.id)
       .query(`UPDATE dbo.Flights SET status = 'Cancelled' WHERE flight_id = @id`);
@@ -137,11 +227,20 @@ const deleteFlight = async (req, res) => {
 // ── Aircrafts ─────────────────────────────────────────────────
 const getAircrafts = async (req, res) => {
   try {
-    const pool = await getPool();
-    const result = await pool.request().query(`
+    const pool    = await getPool();
+    const request = pool.request();
+
+    let whereClause = '';
+    if (isAirlineAdmin(req)) {
+      request.input('airline_id', sql.Int, req.user.airline_id);
+      whereClause = 'WHERE ac.airline_id = @airline_id';
+    }
+
+    const result = await request.query(`
       SELECT ac.*, al.airline_name, al.airline_code, al.logo_url AS airline_logo
       FROM dbo.Aircrafts ac
       LEFT JOIN dbo.Airlines al ON ac.airline_id = al.airline_id
+      ${whereClause}
       ORDER BY ac.model_name
     `);
     res.json({ success: true, data: result.recordset });
@@ -153,8 +252,11 @@ const getAircrafts = async (req, res) => {
 
 const createAircraft = async (req, res) => {
   try {
-    const { model_name, manufacturer, total_seats, airline_id, status } = req.body;
     const pool = await getPool();
+    let { model_name, manufacturer, total_seats, airline_id, status } = req.body;
+
+    if (isAirlineAdmin(req)) airline_id = req.user.airline_id;
+
     const result = await pool.request()
       .input('model_name',   sql.NVarChar, model_name)
       .input('manufacturer', sql.NVarChar, manufacturer)
@@ -175,8 +277,20 @@ const createAircraft = async (req, res) => {
 
 const updateAircraft = async (req, res) => {
   try {
-    const { model_name, manufacturer, total_seats, airline_id, status } = req.body;
     const pool = await getPool();
+
+    if (isAirlineAdmin(req)) {
+      const check = await pool.request()
+        .input('id',         sql.Int, req.params.id)
+        .input('airline_id', sql.Int, req.user.airline_id)
+        .query(`SELECT 1 FROM dbo.Aircrafts WHERE aircraft_id = @id AND airline_id = @airline_id`);
+      if (check.recordset.length === 0)
+        return res.status(403).json({ success: false, message: 'Bạn không có quyền sửa máy bay này' });
+    }
+
+    let { model_name, manufacturer, total_seats, airline_id, status } = req.body;
+    if (isAirlineAdmin(req)) airline_id = req.user.airline_id;
+
     await pool.request()
       .input('id',           sql.Int,      req.params.id)
       .input('model_name',   sql.NVarChar, model_name)
@@ -201,19 +315,24 @@ const deleteAircraft = async (req, res) => {
   try {
     const pool = await getPool();
 
-    // Kiểm tra có flight đang dùng không
-    const check = await pool.request()
+    if (isAirlineAdmin(req)) {
+      const check = await pool.request()
+        .input('id',         sql.Int, req.params.id)
+        .input('airline_id', sql.Int, req.user.airline_id)
+        .query(`SELECT 1 FROM dbo.Aircrafts WHERE aircraft_id = @id AND airline_id = @airline_id`);
+      if (check.recordset.length === 0)
+        return res.status(403).json({ success: false, message: 'Bạn không có quyền xóa máy bay này' });
+    }
+
+    const checkFlights = await pool.request()
       .input('id', sql.Int, req.params.id)
       .query(`SELECT COUNT(*) AS cnt FROM dbo.Flights WHERE aircraft_id = @id AND status != 'Cancelled'`);
-
-    if (check.recordset[0].cnt > 0)
+    if (checkFlights.recordset[0].cnt > 0)
       return res.status(400).json({ success: false, message: 'Không thể xóa: máy bay đang được sử dụng trong các chuyến bay' });
 
-    // Soft delete
     await pool.request()
       .input('id', sql.Int, req.params.id)
       .query(`UPDATE dbo.Aircrafts SET status = N'Ngừng hoạt động' WHERE aircraft_id = @id`);
-
     res.json({ success: true, message: 'Đã ngừng hoạt động máy bay' });
   } catch (err) {
     console.error('deleteAircraft error:', err);
@@ -222,6 +341,7 @@ const deleteAircraft = async (req, res) => {
 };
 
 // ── Airports ──────────────────────────────────────────────────
+// Chỉ SUPER_ADMIN dùng (đã chặn ở routes), giữ nguyên
 const getAirports = async (req, res) => {
   try {
     const pool = await getPool();
@@ -333,8 +453,17 @@ const deleteService = async (req, res) => {
 // ── Bookings ──────────────────────────────────────────────────
 const getBookings = async (req, res) => {
   try {
-    const pool = await getPool();
-    const result = await pool.request().query(`
+    const pool    = await getPool();
+    const request = pool.request();
+
+    // AIRLINE_ADMIN chỉ thấy booking có ticket thuộc chuyến bay của hãng mình
+    let whereClause = '';
+    if (isAirlineAdmin(req)) {
+      request.input('airline_id', sql.Int, req.user.airline_id);
+      whereClause = 'WHERE f.airline_id = @airline_id';
+    }
+
+    const result = await request.query(`
       SELECT
         b.booking_id, b.user_id, b.booking_ref, b.booking_date,
         b.total_amount, b.status, b.cancel_reason,
@@ -344,6 +473,8 @@ const getBookings = async (req, res) => {
       FROM dbo.Bookings b
       JOIN dbo.Users u   ON b.user_id    = u.user_id
       JOIN dbo.Tickets t ON t.booking_id = b.booking_id
+      JOIN dbo.Flights f ON t.flight_id  = f.flight_id
+      ${whereClause}
       GROUP BY b.booking_id, b.user_id, b.booking_ref, b.booking_date,
                b.total_amount, b.status, b.cancel_reason,
                b.contact_name, b.contact_email, b.contact_phone,
@@ -357,17 +488,29 @@ const getBookings = async (req, res) => {
   }
 };
 
-// Duyệt yêu cầu hủy vé của khách → chuyển sang 'Đã hủy'
 const approveCancel = async (req, res) => {
   try {
     const pool = await getPool();
+
+    // AIRLINE_ADMIN: chỉ duyệt hủy booking của chuyến bay hãng mình
+    if (isAirlineAdmin(req)) {
+      const check = await pool.request()
+        .input('booking_id', sql.Int, req.params.id)
+        .input('airline_id', sql.Int, req.user.airline_id)
+        .query(`
+          SELECT 1 FROM dbo.Tickets t
+          JOIN dbo.Flights f ON t.flight_id = f.flight_id
+          WHERE t.booking_id = @booking_id AND f.airline_id = @airline_id
+        `);
+      if (check.recordset.length === 0)
+        return res.status(403).json({ success: false, message: 'Bạn không có quyền duyệt booking này' });
+    }
+
     const r = await pool.request()
       .input('id', sql.Int, req.params.id)
       .query(`UPDATE dbo.Bookings SET status = N'Đã hủy' WHERE booking_id = @id AND status = N'Chờ hủy'`);
-
     if (r.rowsAffected[0] === 0)
       return res.status(400).json({ success: false, message: 'Không tìm thấy yêu cầu hủy hoặc vé không ở trạng thái chờ hủy' });
-
     res.json({ success: true, message: 'Đã duyệt hủy vé' });
   } catch (err) {
     console.error('approveCancel error:', err);
@@ -375,10 +518,23 @@ const approveCancel = async (req, res) => {
   }
 };
 
-// Từ chối yêu cầu hủy vé → trả về 'Chờ xử lý'
 const rejectCancel = async (req, res) => {
   try {
     const pool = await getPool();
+
+    if (isAirlineAdmin(req)) {
+      const check = await pool.request()
+        .input('booking_id', sql.Int, req.params.id)
+        .input('airline_id', sql.Int, req.user.airline_id)
+        .query(`
+          SELECT 1 FROM dbo.Tickets t
+          JOIN dbo.Flights f ON t.flight_id = f.flight_id
+          WHERE t.booking_id = @booking_id AND f.airline_id = @airline_id
+        `);
+      if (check.recordset.length === 0)
+        return res.status(403).json({ success: false, message: 'Bạn không có quyền từ chối booking này' });
+    }
+
     const r = await pool.request()
       .input('id', sql.Int, req.params.id)
       .query(`
@@ -386,10 +542,8 @@ const rejectCancel = async (req, res) => {
         SET status = N'Chờ xử lý', cancel_reason = NULL
         WHERE booking_id = @id AND status = N'Chờ hủy'
       `);
-
     if (r.rowsAffected[0] === 0)
       return res.status(400).json({ success: false, message: 'Không tìm thấy yêu cầu hủy hoặc vé không ở trạng thái chờ hủy' });
-
     res.json({ success: true, message: 'Đã từ chối yêu cầu hủy vé' });
   } catch (err) {
     console.error('rejectCancel error:', err);
@@ -397,17 +551,15 @@ const rejectCancel = async (req, res) => {
   }
 };
 
-// Soft delete + filter: đổi status Đã hủy, sẽ không hiện trong getBookings
 const deleteBooking = async (req, res) => {
+  // Chỉ SUPER_ADMIN (đã chặn ở routes)
   try {
     const pool = await getPool();
     const r = await pool.request()
       .input('id', sql.Int, req.params.id)
       .query(`UPDATE dbo.Bookings SET is_deleted = 1 WHERE booking_id = @id`);
-
     if (r.rowsAffected[0] === 0)
       return res.status(400).json({ success: false, message: 'Không tìm thấy đặt vé' });
-
     res.json({ success: true, message: 'Đã xóa đặt vé' });
   } catch (err) {
     console.error('deleteBooking error:', err);
@@ -416,6 +568,7 @@ const deleteBooking = async (req, res) => {
 };
 
 // ── Airlines ──────────────────────────────────────────────────
+// Tạo/sửa/xóa chỉ SUPER_ADMIN (đã chặn ở routes), giữ nguyên logic
 const getAirlines = async (req, res) => {
   try {
     const pool = await getPool();
@@ -484,12 +637,13 @@ const deleteAirline = async (req, res) => {
 };
 
 // ── Customers ─────────────────────────────────────────────────
+// Chỉ SUPER_ADMIN (đã chặn ở routes), giữ nguyên
 const getCustomers = async (req, res) => {
   try {
     const pool = await getPool();
     const result = await pool.request().query(`
-      SELECT user_id, username, email, phone_number, role, status, created_at
-      FROM dbo.Users WHERE role != 'admin' ORDER BY created_at DESC
+      SELECT user_id, username, email, phone_number, role, airline_id, status, created_at
+      FROM dbo.Users WHERE role = 'USER' ORDER BY created_at DESC
     `);
     res.json({ success: true, data: result.recordset });
   } catch (err) {

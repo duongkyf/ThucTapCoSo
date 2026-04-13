@@ -17,28 +17,24 @@ export const useAuth = () => {
   const [error,   setError]   = useState('');
 
   // ── Tự động refresh user từ server khi app khởi động ─────────
-  // Đảm bảo dữ liệu (id_number, phone_number...) luôn mới nhất
   useEffect(() => {
     const token = localStorage.getItem(TOKEN_KEY);
-    if (!token) return; // chưa đăng nhập → bỏ qua
-
+    if (!token) return;
     authService.getMe()
       .then(({ data }) => {
         if (data?.success && data.user) {
-          // Cập nhật state và localStorage với dữ liệu mới nhất từ server
           setUser(data.user);
           localStorage.setItem(USER_KEY, JSON.stringify(data.user));
         }
       })
       .catch(() => {
-        // Token hết hạn hoặc lỗi → đăng xuất
         localStorage.removeItem(USER_KEY);
         localStorage.removeItem(TOKEN_KEY);
         setUser(null);
       });
-  }, []); // chỉ chạy 1 lần khi mount
+  }, []);
 
-  // Sync user to localStorage mỗi khi thay đổi
+  // Sync user to localStorage
   useEffect(() => {
     if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
     else {
@@ -88,5 +84,19 @@ export const useAuth = () => {
 
   const clearError = useCallback(() => setError(''), []);
 
-  return { user, setUser, loading, error, clearError, login, register, logout };
+  // ── Role helpers ──────────────────────────────────────────────
+  const isSuperAdmin   = user?.role === 'SUPER_ADMIN';
+  const isAirlineAdmin = user?.role === 'AIRLINE_ADMIN';
+  const isAdmin        = isSuperAdmin || isAirlineAdmin;  // bất kỳ admin nào
+  const airlineId      = user?.airline_id ?? null;
+
+  return {
+    user, setUser, loading, error, clearError,
+    login, register, logout,
+    // role helpers — dùng trực tiếp trong component
+    isSuperAdmin,
+    isAirlineAdmin,
+    isAdmin,
+    airlineId,
+  };
 };

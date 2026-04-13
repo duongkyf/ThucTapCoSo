@@ -3,6 +3,7 @@ const jwt     = require('jsonwebtoken');
 const { sql, getPool } = require('../../config/db');
 
 // ── Helpers ───────────────────────────────────────────────────
+// Thêm airline_id vào payload để middleware đọc được
 const signToken = (payload) =>
   jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
 
@@ -13,6 +14,7 @@ const safeUser = (u) => ({
   phone_number: u.phone_number,
   id_number:    u.id_number,
   role:         u.role,
+  airline_id:   u.airline_id ?? null,   // ← THÊM MỚI
   status:       u.status,
   created_at:   u.created_at,
 });
@@ -25,7 +27,6 @@ const register = async (req, res) => {
 
     const pool = await getPool();
 
-    // Check duplicate email
     const exists = await pool.request()
       .input('email', sql.NVarChar, email)
       .query('SELECT user_id FROM dbo.Users WHERE email = @email');
@@ -44,12 +45,14 @@ const register = async (req, res) => {
       .query(`
         INSERT INTO dbo.Users (username, password_hash, email, phone_number, id_number)
         OUTPUT INSERTED.user_id, INSERTED.username, INSERTED.email,
-               INSERTED.phone_number, INSERTED.id_number, INSERTED.role, INSERTED.status, INSERTED.created_at
+               INSERTED.phone_number, INSERTED.id_number, INSERTED.role,
+               INSERTED.airline_id, INSERTED.status, INSERTED.created_at
         VALUES (@username, @password_hash, @email, @phone_number, @id_number)
       `);
 
     const user  = result.recordset[0];
-    const token = signToken({ user_id: user.user_id, role: user.role });
+    // ← airline_id luôn null khi tự register (USER thường)
+    const token = signToken({ user_id: user.user_id, role: user.role, airline_id: user.airline_id ?? null });
 
     res.status(201).json({ success: true, token, user: safeUser(user) });
   } catch (err) {
@@ -79,7 +82,12 @@ const login = async (req, res) => {
     if (!match)
       return res.status(401).json({ success: false, message: 'Email hoặc mật khẩu không đúng' });
 
-    const token = signToken({ user_id: user.user_id, role: user.role });
+    // ← Đưa airline_id vào token để controller dùng
+    const token = signToken({
+      user_id:    user.user_id,
+      role:       user.role,
+      airline_id: user.airline_id ?? null,
+    });
 
     res.json({ success: true, token, user: safeUser(user) });
   } catch (err) {
