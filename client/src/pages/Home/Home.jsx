@@ -1,57 +1,65 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import FlightSearch  from '../flights/FlightSearch';
-import FlightCard    from '../flights/FlightCard';
-import Stepper       from '../flights/Stepper';
+import FlightSearch from '../flights/FlightSearch';
+import FlightCard from '../flights/FlightCard';
+import Stepper from '../flights/Stepper';
 import PassengerForm from '../flights/PassengerForm';
-import Services      from '../flights/Services';
-import Payment       from '../flights/Payment';
-import Success       from '../flights/Success';
-import { flightService }  from '../../services/flight.service';
+import Services from '../flights/Services';
+import Payment from '../flights/Payment';
+import Success from '../flights/Success';
+import { flightService } from '../../services/flight.service';
 import { bookingService } from '../../services/booking.service';
 import '../../style/Home.css';
 
 // ─── Static data ──────────────────────────────────────────────
 const POPULAR_DESTINATIONS = [
-  { city: 'Đà Nẵng',  country: 'Việt Nam', price: '1.299.000 VND', img: 'https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?w=600' },
-  { city: 'Tokyo',    country: 'Nhật Bản',  price: '8.990.000 VND', img: 'https://images.unsplash.com/photo-1549693578-d683be217e58?q=80&w=1477' },
-  { city: 'Paris',    country: 'Pháp',      price: '15.490.000 VND', img: 'https://images.unsplash.com/photo-1642947392578-b37fbd9a4d45?w=1080' },
+  { city: 'Đà Nẵng', country: 'Việt Nam', price: '1.299.000 VND', img: 'https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?w=600' },
+  { city: 'Tokyo', country: 'Nhật Bản', price: '8.990.000 VND', img: 'https://images.unsplash.com/photo-1549693578-d683be217e58?q=80&w=1477' },
+  { city: 'Paris', country: 'Pháp', price: '15.490.000 VND', img: 'https://images.unsplash.com/photo-1642947392578-b37fbd9a4d45?w=1080' },
 ];
 
 const FEATURE_SERVICES = [
-  { title: 'Suất ăn đa dạng',      desc: 'Thưởng thức các món ăn ngon được chuẩn bị bởi các đầu bếp hàng đầu.', icon: 'fas fa-utensils',       img: 'https://images.unsplash.com/photo-1626201853398-7cba6a8ebd7f?w=1080' },
-  { title: 'Chọn chỗ thoải mái',   desc: 'Chọn chỗ ngồi ưa thích của bạn với các lựa chọn chỗ để chân rộng rãi.', icon: 'fas fa-chair',        img: 'https://images.unsplash.com/photo-1764023602899-b862aea3b897?w=1080' },
-  { title: 'Hành lý linh hoạt',    desc: 'Du lịch thoải mái với chính sách hành lý hào phóng của chúng tôi.',    icon: 'fas fa-suitcase-rolling', img: 'https://images.unsplash.com/photo-1714235058817-af16a662fe1d?w=1080' },
+  { title: 'Suất ăn đa dạng', desc: 'Thưởng thức các món ăn ngon được chuẩn bị bởi các đầu bếp hàng đầu.', icon: 'fas fa-utensils', img: 'https://images.unsplash.com/photo-1626201853398-7cba6a8ebd7f?w=1080' },
+  { title: 'Chọn chỗ thoải mái', desc: 'Chọn chỗ ngồi ưa thích của bạn với các lựa chọn chỗ để chân rộng rãi.', icon: 'fas fa-chair', img: 'https://images.unsplash.com/photo-1764023602899-b862aea3b897?w=1080' },
+  { title: 'Hành lý linh hoạt', desc: 'Du lịch thoải mái với chính sách hành lý hào phóng của chúng tôi.', icon: 'fas fa-suitcase-rolling', img: 'https://images.unsplash.com/photo-1714235058817-af16a662fe1d?w=1080' },
 ];
 
 // Chuyển flight từ API sang format FlightCard cần
 const mapFlight = (f) => {
   return {
-  id:         f.flight_id,
-  flightCode: f.flight_code,
-  airline:    f.airline_name  || f.flight_code?.slice(0,2),
-  airlineCode:f.airline_code  || f.flight_code?.slice(0,2),
-  logo:       f.airline_logo  || '',
-  from:       f.origin_iata,
-  to:         f.dest_iata,
-  fromCity:   f.origin_city,
-  toCity:     f.dest_city,
-  time:       new Date(f.departure_time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-  arrTime:    new Date(f.arrival_time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-  duration:   `${Math.floor(f.duration_minutes / 60)}h ${f.duration_minutes % 60}m`,
-  type:       'Bay thẳng',
-  available_seats: f.available_seats,
-  aircraft:   f.aircraft_model,
-  classes: [
-    { type: 'eco',      name: 'Phổ thông',           price: Number(f.base_price),       isPopular: true,
-      benefits: ['Hành lý xách tay 7kg', 'Chọn ghế tiêu chuẩn', 'Đổi vé 1 lần'] },
-    { type: 'premium',  name: 'Phổ thông đặc biệt',  price: Number(f.base_price) * 1.5,
-      benefits: ['Hành lý 15kg', 'Ghế rộng hơn +5cm', 'Ưu tiên lên máy bay', 'Đổi vé miễn phí'] },
-    { type: 'business', name: 'Thương gia',           price: Number(f.base_price) * 2.5,
-      benefits: ['Hành lý 30kg', 'Ghế rộng hơn', 'Ưu tiên lên máy bay', 'Bữa ăn cao cấp'] },
-    { type: 'first',    name: 'Hạng nhất',            price: Number(f.base_price) * 4,
-      benefits: ['Hành lý 40kg', 'Phòng chờ VIP', 'Bữa ăn Chef', 'Ghế nằm hoàn toàn'] },
-  ],
-  raw: f,
+    id: f.flight_id,
+    flightCode: f.flight_code,
+    airline: f.airline_name || f.flight_code?.slice(0, 2),
+    airlineCode: f.airline_code || f.flight_code?.slice(0, 2),
+    logo: f.airline_logo || '',
+    from: f.origin_iata,
+    to: f.dest_iata,
+    fromCity: f.origin_city,
+    toCity: f.dest_city,
+    time: new Date(f.departure_time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+    arrTime: new Date(f.arrival_time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+    duration: `${Math.floor(f.duration_minutes / 60)}h ${f.duration_minutes % 60}m`,
+    type: 'Bay thẳng',
+    available_seats: f.available_seats,
+    aircraft: f.aircraft_model,
+    classes: [
+      {
+        type: 'eco', name: 'Phổ thông', price: Number(f.base_price), isPopular: true,
+        benefits: ['Hành lý xách tay 7kg', 'Chọn ghế tiêu chuẩn', 'Đổi vé 1 lần']
+      },
+      {
+        type: 'premium', name: 'Phổ thông đặc biệt', price: Number(f.base_price) * 1.5,
+        benefits: ['Hành lý 15kg', 'Ghế rộng hơn +5cm', 'Ưu tiên lên máy bay', 'Đổi vé miễn phí']
+      },
+      {
+        type: 'business', name: 'Thương gia', price: Number(f.base_price) * 2.5,
+        benefits: ['Hành lý 30kg', 'Ghế rộng hơn', 'Ưu tiên lên máy bay', 'Bữa ăn cao cấp']
+      },
+      {
+        type: 'first', name: 'Hạng nhất', price: Number(f.base_price) * 4,
+        benefits: ['Hành lý 40kg', 'Phòng chờ VIP', 'Bữa ăn Chef', 'Ghế nằm hoàn toàn']
+      },
+    ],
+    raw: f,
   };
 };
 
@@ -59,16 +67,16 @@ const STEPS = ['Chọn chuyến bay', 'Thông tin hành khách', 'Dịch vụ', 
 
 // ─── Home Component ───────────────────────────────────────────
 const Home = ({ user, onOpenAuth }) => {
-  const [airports,      setAirports]      = useState([]);
-  const [step,          setStep]          = useState(0);
-  const [flights,       setFlights]       = useState([]);
-  const [searching,     setSearching]     = useState(false);
-  const [searchError,   setSearchError]   = useState('');
-  const [hasSearched,   setHasSearched]   = useState(false);
-  const [searchParams,  setSearchParams]  = useState(null);
-  const [selectedFlight,setSelectedFlight]= useState(null);
-  const [passengers,    setPassengers]    = useState([]);
-  const [selectedSvcs,  setSelectedSvcs]  = useState([]);
+  const [airports, setAirports] = useState([]);
+  const [step, setStep] = useState(0);
+  const [flights, setFlights] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState('');
+  const [hasSearched, setHasSearched] = useState(false);
+  const [searchParams, setSearchParams] = useState(null);
+  const [selectedFlight, setSelectedFlight] = useState(null);
+  const [passengers, setPassengers] = useState([]);
+  const [selectedSvcs, setSelectedSvcs] = useState([]);
   const [bookingResult, setBookingResult] = useState(null);
 
   // Load airports
@@ -91,17 +99,52 @@ const Home = ({ user, onOpenAuth }) => {
 
   // Search flights
   const handleSearch = useCallback(async ({ fromLoc, toLoc, departDate, pax }) => {
-    setSearching(true); setSearchError(''); setHasSearched(true);
+    setSearching(true);
+    setSearchError('');
+    setHasSearched(true);
     setSearchParams({ fromLoc, toLoc, departDate, pax });
+
     try {
-      const res = await flightService.search({ from: fromLoc, to: toLoc, date: departDate });
-      // Nhúng pax thẳng vào từng flight để không phụ thuộc vào closure
-      setFlights((res.data?.data || []).map(f => ({ ...mapFlight(f), pax })));
+      const res = await flightService.searchWithAI({
+        from: fromLoc,
+        to: toLoc,
+        date: departDate,
+        passengers: (pax?.adult || 1) + (pax?.child || 0),
+        userId: user?.user_id ?? null,   // null nếu guest
+      });
+
+      const rawFlights = res.data?.data || [];
+      const aiEnabled = res.data?.aiEnabled ?? false;
+      const meta = res.data?.meta ?? {};
+
+      // mapFlight giữ nguyên, chỉ thêm các field AI vào
+      const mapped = rawFlights.map(f => ({
+        ...mapFlight(f),
+        pax,
+        // AI fields — dùng trong AIExplanationModal
+        ai_rank: f.ai_rank ?? null,
+        ai_score: f.ai_score ?? 0,
+        explanation: f.explanation ?? null,
+        aiEnabled,
+        aiMeta: meta,
+      }));
+
+      // Sắp xếp: có ai_rank lên trước (tăng dần), null xuống cuối
+      mapped.sort((a, b) => {
+        if (a.ai_rank === null && b.ai_rank === null) return 0;
+        if (a.ai_rank === null) return 1;
+        if (b.ai_rank === null) return -1;
+        return a.ai_rank - b.ai_rank;
+      });
+
+      setFlights(mapped);
     } catch {
       setSearchError('Không thể tải dữ liệu chuyến bay. Vui lòng thử lại.');
       setFlights([]);
-    } finally { setSearching(false); }
-  }, []);
+    } finally {
+      setSearching(false);
+    }
+  }, [user]);
 
   // Select flight → go to step 1
   const handleSelectFlight = useCallback((flight, cls) => {
@@ -130,31 +173,31 @@ const Home = ({ user, onOpenAuth }) => {
   const handlePayment = useCallback(async (paymentData) => {
     try {
       const contact = {
-        name:  passengers[0]?.passenger_name || '',
+        name: passengers[0]?.passenger_name || '',
         email: passengers[0]?.email || '',
         phone: passengers[0]?.phone || '',
       };
 
-      const basePrice    = selectedFlight.selectedClass.price;
+      const basePrice = selectedFlight.selectedClass.price;
       const priceWithTax = Math.round(basePrice * 1.1); // giá vé đã bao gồm thuế 10%
 
       // Gom dịch vụ từ selectedSvcs thành list { name, price }
       const servicesList = [
-        ...Object.entries(selectedSvcs?.baggage   || {}),
+        ...Object.entries(selectedSvcs?.baggage || {}),
         ...Object.entries(selectedSvcs?.oversized || {}),
-        ...Object.entries(selectedSvcs?.meal      || {}),
+        ...Object.entries(selectedSvcs?.meal || {}),
       ]
         .filter(([, price]) => price > 0)
         .map(([key, price]) => ({ name: key, price }));
 
       const res = await bookingService.create({
-        flight_id:  selectedFlight.id,
+        flight_id: selectedFlight.id,
         passengers: passengers.map((p) => ({
           passenger_name: p.passenger_name,
           passenger_type: p.passenger_type || 'adult',
-          identity_card:  p.identity_card  || '',
-          ticket_price:   priceWithTax,                        // ← có thuế 10%
-          class:          selectedFlight.selectedClass.type || 'eco',
+          identity_card: p.identity_card || '',
+          ticket_price: priceWithTax,                        // ← có thuế 10%
+          class: selectedFlight.selectedClass.type || 'eco',
         })),
         services: servicesList,                                // ← truyền dịch vụ thật
         contact,

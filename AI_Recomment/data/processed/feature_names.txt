@@ -1,0 +1,17 @@
+price_norm
+duration_norm
+stops_num_norm
+dep_slot_norm
+is_business
+airline_idx_norm
+u_price_sensitivity
+u_duration_preference
+u_stop_tolerance
+u_airline_loyalty
+u_morning_preference
+u_business_class_pref
+price_match
+duration_match
+stop_match
+airline_match
+timeslot_match
