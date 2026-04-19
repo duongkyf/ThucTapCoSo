@@ -32,7 +32,7 @@ const PaxDropdown = ({ pax, onChange }) => (
 );
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-const FlightSearch = ({ airports, onSearch }) => {
+const FlightSearch = ({ airports, onSearch, onOpenSlider }) => {
   const [tripType, setTripType] = useState('roundtrip');
   const [fromLoc, setFromLoc] = useState('SGN');
   const [toLoc, setToLoc] = useState('HAN');
@@ -165,9 +165,23 @@ const FlightSearch = ({ airports, onSearch }) => {
             </div>
           </div>
 
-          <div className="search-action">
+          <div className="search-action" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <button className="btn-search-orange" onClick={handleSearch}>
               TÌM CHUYẾN BAY
+            </button>
+            <button
+              className="btn-ai-slider"
+              onClick={() => onOpenSlider?.()}
+              title="Tùy chỉnh ưu tiên gợi ý AI"
+              style={{
+                background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '12px',
+                padding: '0 16px', height: '48px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '8px',
+                fontSize: '14px', fontWeight: 500, color: '#334155',
+              }}
+            >
+              <i className="fas fa-sliders-h" />
+              <span>Tùy chỉnh</span>
             </button>
           </div>
         </div>

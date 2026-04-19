@@ -62,10 +62,9 @@ const getById = async (req, res) => {
     const result = await pool.request()
       .input('id', sql.Int, req.params.id)
       .query(`
-        SELECT
-          f.*, a.model_name, a.total_seats,
-          src.name AS origin_name,  src.city AS origin_city,
-          dst.name AS dest_name,    dst.city AS dest_city
+        SELECT f.*, a.model_name, a.total_seats,
+          src.name AS origin_name, src.city AS origin_city,
+          dst.name AS dest_name,   dst.city AS dest_city
         FROM dbo.Flights f
         JOIN dbo.Aircrafts a  ON f.aircraft_id            = a.aircraft_id
         JOIN dbo.Airports src ON f.source_airport_id      = src.airport_id
@@ -90,15 +89,13 @@ const getSeats = async (req, res) => {
     const result = await pool.request()
       .input('id', sql.Int, req.params.id)
       .query(`
-        SELECT
-          sm.seat_id, sm.seat_code, sm.seat_class, sm.is_exit_row, sm.surcharge,
+        SELECT sm.seat_id, sm.seat_code, sm.seat_class, sm.is_exit_row, sm.surcharge,
           CASE WHEN t.seat_id IS NOT NULL THEN 1 ELSE 0 END AS is_occupied
         FROM dbo.Flights f
         JOIN dbo.Aircrafts a  ON f.aircraft_id = a.aircraft_id
         JOIN dbo.SeatMaps sm  ON sm.aircraft_id = a.aircraft_id
         LEFT JOIN dbo.Tickets t
-          ON t.seat_id = sm.seat_id AND t.flight_id = f.flight_id
-          AND t.status != N'Đã hủy'
+          ON t.seat_id = sm.seat_id AND t.flight_id = f.flight_id AND t.status != N'Đã hủy'
         WHERE f.flight_id = @id
         ORDER BY sm.seat_code
       `);
@@ -136,17 +133,14 @@ const getAirports = async (req, res) => {
   }
 };
 
-// ── AI Search (MỚI) ───────────────────────────────────────────
+// ── AI Search ─────────────────────────────────────────────────
 /**
  * POST /api/flights/ai-search
- * Body: { from, to, date, passengers, class, userId }
+ * Body: { from, to, date, passengers, class, userId, customVector }
  *
- * Luồng:
- *  1. Query SQL → flights thật theo tuyến + ngày
- *  2. Tính preference vector từ lịch sử booking của user
- *  3. Gọi FastAPI /search-by-vector → ranked list
- *  4. Merge AI rank vào SQL data
- *  5. Trả về React
+ * customVector: array [6] từ PreferenceSliderModal nếu user tùy chỉnh.
+ * Nếu có customVector → dùng luôn, không tính từ SQL.
+ * Nếu không → tính từ booking history (computePreferenceVector).
  */
 const aiSearch = async (req, res) => {
   try {
@@ -155,13 +149,14 @@ const aiSearch = async (req, res) => {
       to,
       date,
       class: seatClass,
-      userId,       // null nếu guest
+      userId,
+      customVector,   // [price, dur, stop, airline, morning, business] | null
     } = req.body;
 
     if (!from || !to || !date)
       return res.status(400).json({ success: false, message: 'Thiếu thông tin tìm kiếm' });
 
-    // ── 1. Lấy flights thật từ SQL ────────────────────────
+    // ── 1. Lấy flights thật từ SQL ─────────────────────────
     const pool   = await getPool();
     const sqlRes = await pool.request()
       .input('from', sql.Char,     from.toUpperCase())
@@ -179,15 +174,10 @@ const aiSearch = async (req, res) => {
             ELSE f.arrival_time
           END AS arrival_time,
           f.base_price, f.status, f.is_recurring,
-          a.model_name  AS aircraft_model,
-          a.total_seats,
-          al.airline_code,
-          al.airline_name,
-          al.logo_url   AS airline_logo,
-          src.city      AS origin_city,
-          f.source_airport_id      AS origin_iata,
-          dst.city      AS dest_city,
-          f.destination_airport_id AS dest_iata,
+          a.model_name  AS aircraft_model, a.total_seats,
+          al.airline_code, al.airline_name, al.logo_url AS airline_logo,
+          src.city AS origin_city, f.source_airport_id AS origin_iata,
+          dst.city AS dest_city,   f.destination_airport_id AS dest_iata,
           DATEDIFF(MINUTE, f.departure_time, f.arrival_time) AS duration_minutes,
           (a.total_seats -
             (SELECT COUNT(*) FROM dbo.Tickets t2
@@ -210,27 +200,37 @@ const aiSearch = async (req, res) => {
       `);
 
     const sqlFlights = sqlRes.recordset;
-
     if (sqlFlights.length === 0)
       return res.json({ success: true, data: [], aiEnabled: false, reason: 'no_flights' });
 
-    // ── 2. Tính preference vector ─────────────────────────
-    let prefResult = {
-      vector: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
-      preferredAirline: '',
-      isNewUser: true,
-      bookingCount: 0,
-    };
+    // ── 2. Xác định preference vector ─────────────────────
+    // Ưu tiên: customVector (user tùy chỉnh) > tính từ SQL > cold start
+    let prefResult;
 
-    if (userId) {
+    if (customVector && Array.isArray(customVector) && customVector.length === 6) {
+      // User đã tùy chỉnh → dùng luôn, không query SQL
+      prefResult = {
+        vector:          customVector.map(v => Math.min(1, Math.max(0, Number(v) || 0.5))),
+        preferredAirline: '',   // không cần khi dùng custom
+        isNewUser:        false,
+        bookingCount:     0,
+        isCustom:         true,
+      };
+    } else if (userId) {
+      // Tính từ booking history thật
       try {
         prefResult = await computePreferenceVector(Number(userId));
+        prefResult.isCustom = false;
       } catch (e) {
         console.warn('[aiSearch] computePreferenceVector fallback:', e.message);
+        prefResult = { vector: [0.5,0.5,0.5,0.5,0.5,0.5], preferredAirline: '', isNewUser: true, bookingCount: 0, isCustom: false };
       }
+    } else {
+      // Guest
+      prefResult = { vector: [0.5,0.5,0.5,0.5,0.5,0.5], preferredAirline: '', isNewUser: true, bookingCount: 0, isCustom: false };
     }
 
-    // ── 3. Gọi FastAPI ────────────────────────────────────
+    // ── 3. Gọi FastAPI ─────────────────────────────────────
     let aiResults = [];
     try {
       aiResults = await callAIRanker({
@@ -243,14 +243,13 @@ const aiSearch = async (req, res) => {
       });
     } catch (aiErr) {
       console.error('[aiSearch] FastAPI unavailable:', aiErr.message);
-      // Fallback: trả về SQL không rank
       return res.json({ success: true, data: sqlFlights, aiEnabled: false, reason: 'ai_unavailable' });
     }
 
-    // ── 4. Merge ──────────────────────────────────────────
+    // ── 4. Merge ───────────────────────────────────────────
     const merged = mergeAIWithSQL(aiResults, sqlFlights);
 
-    // ── 5. Response ───────────────────────────────────────
+    // ── 5. Response ────────────────────────────────────────
     return res.json({
       success:   true,
       data:      merged,
@@ -260,6 +259,8 @@ const aiSearch = async (req, res) => {
         bookingCount:     prefResult.bookingCount,
         preferredAirline: prefResult.preferredAirline,
         prefVector:       prefResult.vector,
+        // Truyền customVector xuống React để AIExplanationModal tính % phù hợp đúng
+        customVector:     prefResult.isCustom ? prefResult.vector : null,
       },
     });
 

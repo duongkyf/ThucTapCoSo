@@ -1,4 +1,5 @@
 const { sql, getPool } = require('../../config/db');
+const { updateUserPreferenceOnline, getFlightDetails } = require('../flights/ai.helper');
 
 // ── Generate booking ref ──────────────────────────────────────
 const genRef = () => 'BK-' + Math.random().toString(36).substring(2, 7).toUpperCase();
@@ -52,12 +53,12 @@ const create = async (req, res) => {
     // Tạo booking
     const ref = genRef();
     const bookingRes = await pool.request()
-      .input('uid',   sql.Int,      user_id)
-      .input('ref',   sql.NVarChar, ref)
-      .input('total', sql.Decimal,  total)
-      .input('cn',    sql.NVarChar, contact?.name  || null)
-      .input('ce',    sql.NVarChar, contact?.email || null)
-      .input('cp',    sql.NVarChar, contact?.phone || null)
+      .input('uid', sql.Int, user_id)
+      .input('ref', sql.NVarChar, ref)
+      .input('total', sql.Decimal, total)
+      .input('cn', sql.NVarChar, contact?.name || null)
+      .input('ce', sql.NVarChar, contact?.email || null)
+      .input('cp', sql.NVarChar, contact?.phone || null)
       .query(`
         INSERT INTO dbo.Bookings (user_id, booking_ref, total_amount, contact_name, contact_email, contact_phone)
         OUTPUT INSERTED.booking_id, INSERTED.booking_ref
@@ -68,25 +69,25 @@ const create = async (req, res) => {
 
     // Tạo tickets
     const classMap = { eco: 'economy', premium: 'economy', business: 'business', first: 'first' };
-    const typeMap  = { adult: 'adult', child: 'child', infant: 'infant' };
+    const typeMap = { adult: 'adult', child: 'child', infant: 'infant' };
 
     for (const [i, p] of passengers.entries()) {
       try {
-        const cls  = classMap[p.class]  || classMap[p.ticket_class] || 'economy';
+        const cls = classMap[p.class] || classMap[p.ticket_class] || 'economy';
         const ptype = typeMap[p.passenger_type] || typeMap[p.type] || 'adult';
         const pname = (p.passenger_name || `${p.first_name || ''} ${p.last_name || ''}`.trim() || `Passenger ${i + 1}`).substring(0, 200);
 
         console.log('Inserting ticket:', { pname, ptype, cls, price: p.ticket_price });
 
         const ticketRes = await pool.request()
-          .input('bid',  sql.Int,      booking_id)
-          .input('fid',  sql.Int,      flight_id)
-          .input('sid',  sql.Int,      null)
-          .input('pn',   sql.NVarChar, pname)
-          .input('pt',   sql.NVarChar, ptype)
-          .input('ic',   sql.NVarChar, p.identity_card || null)
-          .input('tp',   sql.Decimal,  Number(p.ticket_price) || Number(flight.base_price) || 0)
-          .input('cls',  sql.NVarChar, cls)
+          .input('bid', sql.Int, booking_id)
+          .input('fid', sql.Int, flight_id)
+          .input('sid', sql.Int, null)
+          .input('pn', sql.NVarChar, pname)
+          .input('pt', sql.NVarChar, ptype)
+          .input('ic', sql.NVarChar, p.identity_card || null)
+          .input('tp', sql.Decimal, Number(p.ticket_price) || Number(flight.base_price) || 0)
+          .input('cls', sql.NVarChar, cls)
           .query(`
             INSERT INTO dbo.Tickets (booking_id, flight_id, seat_id, passenger_name, passenger_type, identity_card, ticket_price, class)
             OUTPUT INSERTED.ticket_id
@@ -99,6 +100,20 @@ const create = async (req, res) => {
       }
     }
 
+    // Cập nhật preference vector online
+    try {
+      const flightDetails = await getFlightDetails(flight_id);
+      if (flightDetails) {
+        // Gán thêm airline_name (đã có), nếu cần thêm is_business thì lấy từ class của vé đầu tiên
+        const firstTicketClass = passengers[0]?.class || 'economy';
+        flightDetails.is_business = (firstTicketClass === 'business' || firstTicketClass === 'first') ? 1 : 0;
+        await updateUserPreferenceOnline(user_id, flightDetails, 'book', 0.1);
+      }
+    } catch (err) {
+      console.error('Online update error:', err);
+      // không fail booking nếu lỗi cập nhật
+    }
+    
     res.status(201).json({
       success: true,
       message: 'Đặt vé thành công',
@@ -147,7 +162,7 @@ const getById = async (req, res) => {
     const pool = await getPool();
     const [booking, tickets] = await Promise.all([
       pool.request()
-        .input('id',  sql.Int, req.params.id)
+        .input('id', sql.Int, req.params.id)
         .input('uid', sql.Int, req.user.user_id)
         .query(`
           SELECT b.*, f.flight_code, f.departure_time, f.arrival_time, f.base_price,
@@ -197,7 +212,7 @@ const cancel = async (req, res) => {
   try {
     const pool = await getPool();
     const r = await pool.request()
-      .input('id',  sql.Int, req.params.id)
+      .input('id', sql.Int, req.params.id)
       .input('uid', sql.Int, req.user.user_id)
       .query(`
         UPDATE dbo.Bookings SET status = N'Đã hủy'
@@ -223,7 +238,7 @@ const checkin = async (req, res) => {
 
     const pool = await getPool();
     const r = await pool.request()
-      .input('ref',  sql.NVarChar, booking_ref.toUpperCase())
+      .input('ref', sql.NVarChar, booking_ref.toUpperCase())
       .query(`
         SELECT TOP 1 b.booking_id, b.booking_ref, b.status,
           f.flight_code, f.departure_time,
@@ -274,8 +289,8 @@ const requestCancel = async (req, res) => {
 
     const pool = await getPool();
     const r = await pool.request()
-      .input('id',     sql.Int,      req.params.id)
-      .input('uid',    sql.Int,      req.user.user_id)
+      .input('id', sql.Int, req.params.id)
+      .input('uid', sql.Int, req.user.user_id)
       .input('reason', sql.NVarChar, reason.trim())
       .query(`
         UPDATE dbo.Bookings
