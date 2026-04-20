@@ -55,7 +55,7 @@ const search = async (req, res) => {
   }
 };
 
-// ── Get flight by ID (giữ nguyên) ─────────────────────────────
+// ── Get flight by ID ──────────────────────────────────────────
 const getById = async (req, res) => {
   try {
     const pool   = await getPool();
@@ -71,10 +71,8 @@ const getById = async (req, res) => {
         JOIN dbo.Airports dst ON f.destination_airport_id = dst.airport_id
         WHERE f.flight_id = @id
       `);
-
     if (!result.recordset[0])
       return res.status(404).json({ success: false, message: 'Không tìm thấy chuyến bay' });
-
     res.json({ success: true, data: result.recordset[0] });
   } catch (err) {
     console.error('getById error:', err);
@@ -82,7 +80,7 @@ const getById = async (req, res) => {
   }
 };
 
-// ── Get seats (giữ nguyên) ────────────────────────────────────
+// ── Get seats ────────────────────────────────────────────────
 const getSeats = async (req, res) => {
   try {
     const pool   = await getPool();
@@ -99,7 +97,6 @@ const getSeats = async (req, res) => {
         WHERE f.flight_id = @id
         ORDER BY sm.seat_code
       `);
-
     res.json({ success: true, data: result.recordset });
   } catch (err) {
     console.error('getSeats error:', err);
@@ -107,7 +104,7 @@ const getSeats = async (req, res) => {
   }
 };
 
-// ── Get services (giữ nguyên) ─────────────────────────────────
+// ── Get services ─────────────────────────────────────────────
 const getServices = async (req, res) => {
   try {
     const pool   = await getPool();
@@ -120,7 +117,7 @@ const getServices = async (req, res) => {
   }
 };
 
-// ── Get airports (giữ nguyên) ─────────────────────────────────
+// ── Get airports ─────────────────────────────────────────────
 const getAirports = async (req, res) => {
   try {
     const pool   = await getPool();
@@ -134,24 +131,9 @@ const getAirports = async (req, res) => {
 };
 
 // ── AI Search ─────────────────────────────────────────────────
-/**
- * POST /api/flights/ai-search
- * Body: { from, to, date, passengers, class, userId, customVector }
- *
- * customVector: array [6] từ PreferenceSliderModal nếu user tùy chỉnh.
- * Nếu có customVector → dùng luôn, không tính từ SQL.
- * Nếu không → tính từ booking history (computePreferenceVector).
- */
 const aiSearch = async (req, res) => {
   try {
-    const {
-      from,
-      to,
-      date,
-      class: seatClass,
-      userId,
-      customVector,   // [price, dur, stop, airline, morning, business] | null
-    } = req.body;
+    const { from, to, date, class: seatClass, userId, customVector } = req.body;
 
     if (!from || !to || !date)
       return res.status(400).json({ success: false, message: 'Thiếu thông tin tìm kiếm' });
@@ -204,30 +186,37 @@ const aiSearch = async (req, res) => {
       return res.json({ success: true, data: [], aiEnabled: false, reason: 'no_flights' });
 
     // ── 2. Xác định preference vector ─────────────────────
-    // Ưu tiên: customVector (user tùy chỉnh) > tính từ SQL > cold start
     let prefResult;
 
     if (customVector && Array.isArray(customVector) && customVector.length === 6) {
-      // User đã tùy chỉnh → dùng luôn, không query SQL
+      // User tùy chỉnh slider → dùng luôn
       prefResult = {
         vector:          customVector.map(v => Math.min(1, Math.max(0, Number(v) || 0.5))),
-        preferredAirline: '',   // không cần khi dùng custom
+        preferredAirline: '',
+        airlineRatios:   {},
+        avgPricesByClass: {},
         isNewUser:        false,
         bookingCount:     0,
         isCustom:         true,
       };
     } else if (userId) {
-      // Tính từ booking history thật
       try {
         prefResult = await computePreferenceVector(Number(userId));
         prefResult.isCustom = false;
       } catch (e) {
         console.warn('[aiSearch] computePreferenceVector fallback:', e.message);
-        prefResult = { vector: [0.5,0.5,0.5,0.5,0.5,0.5], preferredAirline: '', isNewUser: true, bookingCount: 0, isCustom: false };
+        prefResult = {
+          vector: [0.5,0.5,0.5,0.5,0.5,0.5],
+          preferredAirline: '', airlineRatios: {}, avgPricesByClass: {},
+          isNewUser: true, bookingCount: 0, isCustom: false,
+        };
       }
     } else {
-      // Guest
-      prefResult = { vector: [0.5,0.5,0.5,0.5,0.5,0.5], preferredAirline: '', isNewUser: true, bookingCount: 0, isCustom: false };
+      prefResult = {
+        vector: [0.6,0.5,0.5,0.5,0.5,0.5],
+        preferredAirline: '', airlineRatios: {}, avgPricesByClass: {},
+        isNewUser: true, bookingCount: 0, isCustom: false,
+      };
     }
 
     // ── 3. Gọi FastAPI ─────────────────────────────────────
@@ -236,6 +225,7 @@ const aiSearch = async (req, res) => {
       aiResults = await callAIRanker({
         prefVector:       prefResult.vector,
         preferredAirline: prefResult.preferredAirline,
+        airlineRatios:    prefResult.airlineRatios,
         origin:           from,
         destination:      to,
         seatClass:        seatClass && seatClass !== 'economy' ? seatClass : undefined,
@@ -258,8 +248,9 @@ const aiSearch = async (req, res) => {
         isNewUser:        prefResult.isNewUser,
         bookingCount:     prefResult.bookingCount,
         preferredAirline: prefResult.preferredAirline,
+        airlineRatios:    prefResult.airlineRatios,    // VD: { 'Vietjet Air': 0.6, 'Vietnam Airlines': 0.4 }
+        avgPricesByClass: prefResult.avgPricesByClass, // VD: { economy: 890000, business: 2500000 }
         prefVector:       prefResult.vector,
-        // Truyền customVector xuống React để AIExplanationModal tính % phù hợp đúng
         customVector:     prefResult.isCustom ? prefResult.vector : null,
       },
     });

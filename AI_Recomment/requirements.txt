@@ -16,4 +16,6 @@ pydantic>=2.0.0
 
 # Utility
 python-dotenv>=1.0.0
-pyodbc
+
+pyodbc>=4.0.0
+sqlalchemy>=2.0.0

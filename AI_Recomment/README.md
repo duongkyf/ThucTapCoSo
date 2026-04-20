@@ -2,6 +2,8 @@
 
 ## Setup (Trong lần đầu tiên)
 
+Trong database, thêm thuộc tính vào bảng người dùng như sau: ALTER TABLE dbo.Users ADD preference_vector NVARCHAR(MAX) NULL;
+
 ```bash
 # Di chuyển vào thư mục AI_Recomment
 cd AI_Recomment
