@@ -4,7 +4,8 @@ require('dotenv').config();
 const [serverHost, instanceName] = (process.env.DB_HOST || 'localhost').split('\\');
 
 const config = {
-  server:       serverHost,
+  server:       process.env.DB_HOST,
+  port: Number(process.env.DB_PORT),
   instanceName: instanceName || undefined,
   user:         process.env.DB_USER     || 'sa',
   password:     process.env.DB_PASSWORD || '',

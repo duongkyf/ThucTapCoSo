@@ -21,7 +21,7 @@ import os
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from src.data_loader import DataLoader
+from src.data_loader_csv import DataLoader
 from src.step2_features import FeatureEngineer, ALL_FEATURE_NAMES
 
 try:

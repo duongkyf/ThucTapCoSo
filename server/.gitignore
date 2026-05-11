@@ -1,0 +1,118 @@
+# =========================
+# OS FILES
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# ENV
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# PYTHON
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# =========================
+# AI / DATA
+# =========================
+
+# Raw datasets
+AI_Recomment/data/raw/
+
+# Processed outputs
+AI_Recomment/data/processed/
+
+# ML models
+*.pkl
+*.joblib
+*.h5
+*.pt
+*.pth
+
+# Generated images
+*.png
+*.jpg
+*.jpeg
+
+# =========================
+# NODE / REACT
+# =========================
+node_modules/
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Vite build cache
+.vite/
+
+# =========================
+# BUILD
+# =========================
+dist/
+build/
+
+# =========================
+# LOGS
+# =========================
+logs/
+*.log
+
+# =========================
+# IDE
+# =========================
+.vscode/
+.idea/
+
+# =========================
+# DATABASE
+# =========================
+*.sqlite
+*.db
+
+# =========================
+# TEMP FILES
+# =========================
+tmp/
+temp/
+.cache/
+
+# =========================
+# MAC / WINDOWS
+# =========================
+ehthumbs.db
+Desktop.ini
+
+# Python
+.venv/
+venv/
+env/
+
+# Node
+node_modules/
+
+# AI data
+AI_Recomment/data/raw/
+AI_Recomment/data/processed/

@@ -28,7 +28,7 @@ import pickle
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from src.data_loader import DataLoader, PREFERENCE_DIMS
+from src.data_loader_csv import DataLoader, PREFERENCE_DIMS
 
 # ── Đường dẫn output ────────────────────────────────────────────────────────
 BASE_DIR        = Path(__file__).parent.parent
