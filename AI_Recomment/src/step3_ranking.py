@@ -1,16 +1,9 @@
 """
-STEP 3A — Ranking Model (LightGBM LambdaRank)
-=============================================
-Train Learning-to-Rank model trên training data từ Tuần 2.
-Đánh giá bằng NDCG@5 và NDCG@10.
-
-Cách dùng:
-    python src/step3_ranking.py          # train + lưu model
-    
-    Hoặc import để serve:
-        from src.step3_ranking import FlightRanker
-        ranker = FlightRanker.load()
-        results = ranker.rank(candidates_df, user_id)
+STEP 3 — Ranking Model (LightGBM LambdaRank, binary: book=1 / ignore=0)
+========================================================================
+- label_gain=[0,1]  (2 nhãn)
+- Split train/val theo USER (không leakage)
+- lr=0.05, leaves=16, rounds=500 — phù hợp với tập nhỏ hơn sau khi bỏ click
 """
 
 import numpy as np
@@ -27,277 +20,192 @@ from src.step2_features import FeatureEngineer, ALL_FEATURE_NAMES
 try:
     import lightgbm as lgb
 except ImportError:
-    print("[!] Cần cài lightgbm: pip install lightgbm")
-    sys.exit(1)
+    print("[!] pip install lightgbm"); sys.exit(1)
 
-from sklearn.model_selection import GroupShuffleSplit
-
-BASE_DIR   = Path(__file__).parent.parent
-MODEL_OUT  = BASE_DIR / "data/processed/ranker_model.pkl"
+BASE_DIR      = Path(__file__).parent.parent
+MODEL_OUT     = BASE_DIR / "data/processed/ranker_model.pkl"
 FEATURES_PATH = BASE_DIR / "data/processed/train_features.pkl"
 
-# ── LightGBM config ───────────────────────────────────────────────────────────
 LGBM_PARAMS = {
-    "objective":        "lambdarank",
-    "metric":           "ndcg",
-    "ndcg_eval_at":     [5, 10],
-    "learning_rate":    0.05,
-    "num_leaves":       63,
-    "min_child_samples": 20,
-    "feature_fraction": 0.8,
-    "bagging_fraction": 0.8,
-    "bagging_freq":     5,
-    "lambda_l1":        0.1,
-    "lambda_l2":        0.1,
-    "verbose":          -1,
-    "n_jobs":           -1,
+    "objective":                "lambdarank",
+    "metric":                   "ndcg",
+    "ndcg_eval_at":             [5, 10],
+    "learning_rate":            0.05,
+    "num_leaves":               16,
+    "label_gain":               [0, 1],          # ← binary
+    "lambdarank_truncation_level": 10,
+    "min_child_samples":        10,
+    "feature_fraction":         0.7,
+    "bagging_fraction":         0.8,
+    "bagging_freq":             5,
+    "lambda_l1":                0.05,
+    "lambda_l2":                0.05,
+    "verbose":                  -1,
+    "n_jobs":                   -1,
 }
-N_ESTIMATORS   = 300
-EARLY_STOPPING = 30
-TEST_SIZE      = 0.2
-RANDOM_STATE   = 42
-TOP_K          = 10   # số chuyến trả về khi serving
+
+N_ESTIMATORS    = 500
+EARLY_STOPPING  = 50
+TEST_SIZE       = 0.2
+RANDOM_STATE    = 42
+TOP_K           = 10
 
 
 class FlightRanker:
-    """
-    Wrapper cho LightGBM LambdaRank model.
-    Cung cấp interface train / evaluate / rank / explain.
-    """
-
     def __init__(self, dl: DataLoader = None, fe: FeatureEngineer = None):
-        self.dl    = dl
-        self.fe    = fe
-        self.model: lgb.Booster = None
+        self.dl           = dl
+        self.fe           = fe
+        self.model        = None
         self.feature_names = ALL_FEATURE_NAMES
 
-    # ── Train ─────────────────────────────────────────────────────────────
-    def train(self, X: np.ndarray, y: np.ndarray, groups: np.ndarray):
-        """
-        Train LambdaRank model với train/val split theo group (session).
-        
-        LambdaRank tối ưu NDCG trực tiếp — phù hợp hơn cross-entropy
-        cho bài toán ranking vì nó quan tâm đến thứ tự, không chỉ nhãn.
-        """
-        print("[Ranker] Chia train/val theo session groups...")
+    def train(self, X: np.ndarray, y: np.ndarray, groups: np.ndarray,
+              users_df: pd.DataFrame = None):
+        print("[Ranker] Split train/val by USER...")
+        if users_df is None:
+            users_df = self.dl.users
 
-        # Split theo groups để tránh data leakage
-        # (các item trong cùng 1 session phải cùng train hoặc cùng val)
-        gss = GroupShuffleSplit(
-            n_splits=1, test_size=TEST_SIZE, random_state=RANDOM_STATE
+        from sklearn.model_selection import train_test_split
+        all_users   = users_df["user_id"].unique()
+        train_users, val_users = train_test_split(
+            all_users, test_size=TEST_SIZE, random_state=RANDOM_STATE
         )
-        # Tạo group label cho từng item
-        item_groups = np.repeat(np.arange(len(groups)), groups)
-        train_idx, val_idx = next(gss.split(X, y, groups=item_groups))
+        print(f"  Train users: {len(train_users)} | Val users: {len(val_users)}")
 
-        X_train, y_train = X[train_idx], y[train_idx]
-        X_val,   y_val   = X[val_idx],   y[val_idx]
+        history     = self.dl.history
+        # Lọc chỉ binary labels
+        history     = history[history["relevance"].isin([0, 1])]
+        train_idx   = history[history["user_id"].isin(train_users)].index.values
+        val_idx     = history[history["user_id"].isin(val_users)].index.values
 
-        # groups cho train và val
-        train_item_groups = item_groups[train_idx]
-        val_item_groups   = item_groups[val_idx]
+        # Reindex vào X/y (X đã build từ history đã lọc)
+        # Cần align lại: lấy positional index trong filtered history
+        hist_filtered = self.dl.history[self.dl.history["relevance"].isin([0, 1])].reset_index(drop=True)
+        ti = hist_filtered[hist_filtered["user_id"].isin(train_users)].index.values
+        vi = hist_filtered[hist_filtered["user_id"].isin(val_users)].index.values
 
-        _, train_groups = np.unique(train_item_groups, return_counts=True)
-        _, val_groups   = np.unique(val_item_groups,   return_counts=True)
+        X_train, y_train = X[ti], y[ti]
+        X_val,   y_val   = X[vi], y[vi]
 
-        print(f"  Train: {len(X_train):,} items, {len(train_groups):,} sessions")
-        print(f"  Val  : {len(X_val):,} items,   {len(val_groups):,} sessions")
+        sess_ids       = hist_filtered["session_id"].values
+        _, tg = np.unique(sess_ids[ti], return_counts=True)
+        _, vg = np.unique(sess_ids[vi], return_counts=True)
 
-        # Tạo LightGBM Dataset
-        train_ds = lgb.Dataset(
-            X_train, label=y_train,
-            group=train_groups,
-            feature_name=self.feature_names,
-            free_raw_data=False,
-        )
-        val_ds = lgb.Dataset(
-            X_val, label=y_val,
-            group=val_groups,
-            reference=train_ds,
-            feature_name=self.feature_names,
-            free_raw_data=False,
-        )
+        print(f"  Train: {len(X_train):,} items, {len(tg):,} sessions")
+        print(f"  Val  : {len(X_val):,} items, {len(vg):,} sessions")
+        print(f"  Train — book:{(y_train==1).sum():,}  ignore:{(y_train==0).sum():,}")
+        print(f"  Val   — book:{(y_val==1).sum():,}    ignore:{(y_val==0).sum():,}")
 
-        print(f"[Ranker] Bắt đầu training ({N_ESTIMATORS} rounds)...")
+        train_ds = lgb.Dataset(X_train, label=y_train, group=tg,
+                               feature_name=self.feature_names, free_raw_data=False)
+        val_ds   = lgb.Dataset(X_val,   label=y_val,   group=vg,
+                               feature_name=self.feature_names, free_raw_data=False,
+                               reference=train_ds)
+
+        print(f"[Ranker] Training (rounds={N_ESTIMATORS}, lr={LGBM_PARAMS['learning_rate']}, "
+              f"leaves={LGBM_PARAMS['num_leaves']})...")
         callbacks = [
             lgb.early_stopping(EARLY_STOPPING, verbose=False),
             lgb.log_evaluation(period=50),
         ]
         self.model = lgb.train(
-            params         = LGBM_PARAMS,
-            train_set      = train_ds,
-            num_boost_round= N_ESTIMATORS,
-            valid_sets     = [val_ds],
-            callbacks      = callbacks,
+            params        = LGBM_PARAMS,
+            train_set     = train_ds,
+            num_boost_round = N_ESTIMATORS,
+            valid_sets    = [val_ds],
+            callbacks     = callbacks,
         )
+        print(f"\n✓ Best iteration: {self.model.best_iteration}")
+        self._evaluate(X_val, y_val, vg)
 
-        best_round = self.model.best_iteration
-        print(f"\n✓ Training xong — best iteration: {best_round}")
-
-        # Evaluate trên val set
-        self.evaluate(X_val, y_val, val_groups)
-
-    # ── Evaluate ──────────────────────────────────────────────────────────
-    def evaluate(self, X: np.ndarray, y: np.ndarray, groups: np.ndarray):
-        """Tính NDCG@5 và NDCG@10 trên tập val/test."""
-        scores = self.model.predict(X)
-
-        ndcg5_list  = []
-        ndcg10_list = []
-        ptr = 0
-
+    def _evaluate(self, X, y, groups):
+        scores      = self.model.predict(X)
+        n5, n10     = [], []
+        ptr         = 0
         for g in groups:
-            s = scores[ptr:ptr+g]
-            l = y[ptr:ptr+g]
-            ptr += g
-
-            ndcg5_list.append(self._ndcg_at_k(l, s, k=5))
-            ndcg10_list.append(self._ndcg_at_k(l, s, k=10))
-
-        print(f"\n── Evaluation ──────────────────────────────────")
-        print(f"  NDCG@5  : {np.mean(ndcg5_list):.4f}")
-        print(f"  NDCG@10 : {np.mean(ndcg10_list):.4f}")
-        print(f"  (Baseline random ≈ 0.5, mục tiêu > 0.70)")
+            s = scores[ptr:ptr+g]; l = y[ptr:ptr+g]; ptr += g
+            n5.append(self._ndcg(l, s, 5))
+            n10.append(self._ndcg(l, s, 10))
+        print(f"\n── Val Evaluation ──────────────────────────")
+        print(f"  NDCG@5  : {np.mean(n5):.4f}")
+        print(f"  NDCG@10 : {np.mean(n10):.4f}")
 
     @staticmethod
-    def _ndcg_at_k(labels: np.ndarray, scores: np.ndarray, k: int) -> float:
-        """Tính NDCG@k cho 1 query."""
-        order = np.argsort(scores)[::-1][:k]
-        gains = 2 ** labels[order] - 1
-        discounts = np.log2(np.arange(2, len(gains) + 2))
-        dcg = np.sum(gains / discounts)
-
-        ideal_order = np.argsort(labels)[::-1][:k]
-        ideal_gains = 2 ** labels[ideal_order] - 1
-        idcg = np.sum(ideal_gains / discounts[:len(ideal_gains)])
-
+    def _ndcg(labels, scores, k):
+        order  = np.argsort(scores)[::-1][:k]
+        gains  = 2 ** labels[order] - 1
+        disc   = np.log2(np.arange(2, len(gains) + 2))
+        dcg    = np.sum(gains / disc)
+        iorder = np.argsort(labels)[::-1][:k]
+        igains = 2 ** labels[iorder] - 1
+        idcg   = np.sum(igains / disc[:len(igains)])
         return dcg / idcg if idcg > 0 else 0.0
 
-    # ── Feature Importance ────────────────────────────────────────────────
     def print_feature_importance(self):
-        """In feature importance để hiểu model học được gì."""
-        importance = self.model.feature_importance(importance_type="gain")
-        total = importance.sum()
-        pairs = sorted(
-            zip(self.feature_names, importance),
-            key=lambda x: x[1], reverse=True
-        )
-        print("\n── Feature Importance (gain) ───────────────────")
-        for name, imp in pairs:
-            pct = imp / total * 100
-            bar = "█" * int(pct / 2) + "░" * (50 - int(pct / 2))
-            print(f"  {name:<28} {bar[:25]} {pct:5.1f}%")
+        imp   = self.model.feature_importance(importance_type="gain")
+        total = imp.sum()
+        pairs = sorted(zip(self.feature_names, imp), key=lambda x: x[1], reverse=True)
+        print("\n── Feature Importance (gain) ───────────────")
+        for name, v in pairs:
+            pct = v / total * 100
+            bar = "█" * int(pct / 2) + "░" * (25 - int(pct / 2))
+            print(f"  {name:<28} {bar} {pct:5.1f}%")
 
-    # ── Rank candidates (serving) ─────────────────────────────────────────
-    def rank(
-        self,
-        candidates: pd.DataFrame,
-        user_id: str,
-        top_k: int = TOP_K,
-    ) -> pd.DataFrame:
-        """
-        Rank tập candidates cho 1 user.
-        Đây là hàm chính được gọi từ FastAPI.
-
-        Args:
-            candidates: output của DataLoader.get_candidates()
-            user_id:    user đang query
-            top_k:      số kết quả trả về
-
-        Returns:
-            DataFrame top-k chuyến bay, đã sort theo score giảm dần,
-            có thêm cột 'rank_score'
-        """
+    def rank(self, candidates: pd.DataFrame, user_id: str,
+             top_k: int = TOP_K) -> pd.DataFrame:
         if len(candidates) == 0:
             return candidates
-
-        X = self.fe.build_candidate_matrix(candidates, user_id)
+        X      = self.fe.build_candidate_matrix(candidates, user_id)
         scores = self.model.predict(X)
-
         result = candidates.copy()
-        result["rank_score"] = scores
+        result["final_score"] = scores
+        mn, mx = result["final_score"].min(), result["final_score"].max()
+        result["final_score"] = ((result["final_score"] - mn) / (mx - mn)
+                                 if mx > mn else 1.0)
+        return (result.sort_values("final_score", ascending=False)
+                      .head(top_k)
+                      .reset_index(drop=True))
 
-        # Multi-objective re-rank: weighted score
-        # = 0.7 × model_score + 0.2 × (1 - price_norm) + 0.1 × (1 - duration_norm)
-        result["final_score"] = (
-            0.70 * result["rank_score"] +
-            0.20 * (1.0 - result["price_norm"]) +
-            0.10 * (1.0 - result["duration_norm"])
-        )
-        # Normalize final_score về [0, 1]
-        min_s, max_s = result["final_score"].min(), result["final_score"].max()
-        if max_s > min_s:
-            result["final_score"] = (result["final_score"] - min_s) / (max_s - min_s)
-
-        result = result.sort_values("final_score", ascending=False)
-        return result.head(top_k).reset_index(drop=True)
-
-    # ── Save / Load ───────────────────────────────────────────────────────
-    def save(self, path: str = MODEL_OUT):
-        payload = {
-            "model":         self.model,
-            "feature_names": self.feature_names,
-        }
+    def save(self, path=MODEL_OUT):
         with open(path, "wb") as f:
-            pickle.dump(payload, f)
-        print(f"\n✓ Đã lưu model → {path}")
+            pickle.dump({"model": self.model, "feature_names": self.feature_names}, f)
+        print(f"\n✓ Lưu model → {path}")
 
     @classmethod
-    def load(
-        cls,
-        dl: DataLoader = None,
-        fe: FeatureEngineer = None,
-        path: str = MODEL_OUT,
-    ) -> "FlightRanker":
+    def load(cls, dl=None, fe=None, path=MODEL_OUT) -> "FlightRanker":
         with open(path, "rb") as f:
-            payload = pickle.load(f)
-        ranker = cls(dl=dl, fe=fe)
-        ranker.model         = payload["model"]
-        ranker.feature_names = payload["feature_names"]
-        print(f"✓ Đã load model từ {path}")
-        return ranker
+            p = pickle.load(f)
+        r = cls(dl=dl, fe=fe)
+        r.model         = p["model"]
+        r.feature_names = p["feature_names"]
+        return r
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
 def main():
     os.makedirs(BASE_DIR / "data/processed", exist_ok=True)
-
-    # Load data
     dl = DataLoader()
     fe = FeatureEngineer(dl)
 
-    # Load training features (từ step2)
-    print(f"[1/3] Load training features từ {FEATURES_PATH}...")
-    if not FEATURES_PATH.exists():
-        print("[!] Cần chạy step2_features.py trước")
-        sys.exit(1)
-
+    print(f"[1/3] Load features từ {FEATURES_PATH}...")
     with open(FEATURES_PATH, "rb") as f:
         data = pickle.load(f)
     X, y, groups = data["X"], data["y"], data["groups"]
-    print(f"  → X={X.shape}, y={y.shape}, {len(groups)} sessions")
+    print(f"  X={X.shape}, y={y.shape}, sessions={len(groups)}")
+    print(f"  Labels: book(1)={(y==1).sum():,}  ignore(0)={(y==0).sum():,}")
 
-    # Train
-    print(f"\n[2/3] Train LightGBM LambdaRank...")
+    print("\n[2/3] Train LightGBM LambdaRank (binary)...")
     ranker = FlightRanker(dl=dl, fe=fe)
-    ranker.train(X, y, groups)
+    ranker.train(X, y, groups, users_df=dl.users)
     ranker.print_feature_importance()
 
-    # Save
-    print(f"\n[3/3] Lưu model...")
+    print("\n[3/3] Lưu model...")
     ranker.save()
 
-    # Demo ranking
-    print(f"\n── Demo: rank chuyến Delhi → Mumbai cho U00001 ─")
+    print("\n── Demo: Delhi → Mumbai cho U00001 ─")
     candidates = dl.get_candidates("Delhi", "Mumbai")
-    print(f"  Candidates: {len(candidates)} chuyến")
-
+    print(f"  Candidates: {len(candidates)}")
     top = ranker.rank(candidates, "U00001", top_k=5)
-    print(f"\n  Top 5 chuyến bay được gợi ý:")
-    cols = ["flight_id", "airline", "price", "duration",
-            "stops_num", "dep_slot", "seat_class", "final_score"]
-    existing = [c for c in cols if c in top.columns]
-    print(top[existing].to_string(index=False))
+    print(top[["flight_id", "airline", "price", "duration",
+               "stops_num", "dep_slot", "seat_class", "final_score"]].to_string(index=False))
 
 
 if __name__ == "__main__":

@@ -106,8 +106,9 @@ ehthumbs.db
 Desktop.ini
 
 # Python
-.venv/
-venv/
+AI_Recomment/.venv/
+AI_Recomment/venv/
+AI_Recomment/__pycache__/
 env/
 
 # Node
