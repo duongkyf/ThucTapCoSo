@@ -12,7 +12,7 @@ Fix so với bản cũ:
 
 import numpy as np
 import pandas as pd
-from src.data_loader_csv import DataLoader
+from src.data_loader import DataLoader
 
 
 class CandidateRetriever:
@@ -23,7 +23,7 @@ class CandidateRetriever:
 
     def retrieve(self, origin: str, dest: str, user_id: str,
                  top_k: int = 300,
-                 force_include_gt_flight_id: str = None) -> pd.DataFrame:
+                 force_include_gt_flight_ids: list = None) -> pd.DataFrame:
 
         candidates = self.dl.get_candidates(origin, dest)
         if len(candidates) == 0:
@@ -94,11 +94,11 @@ class CandidateRetriever:
         scores   += dur_score * dur_pref * 0.8
 
         # ── Force include ground truth ─────────────────────────────────────────
-        if force_include_gt_flight_id is not None:
-            gt_str  = str(force_include_gt_flight_id)
-            gt_mask = candidates["flight_id"].astype(str) == gt_str
-            if gt_mask.any():
-                scores[gt_mask.values] = scores.max() + 100.0  # đảm bảo luôn top
+        if force_include_gt_flight_ids:
+            for gt_str in force_include_gt_flight_ids:
+                gt_mask = candidates["flight_id"].astype(str) == gt_str
+                if gt_mask.any():
+                    scores[gt_mask.values] = scores.max() + 100.0
 
         # ── Lấy top_k ────────────────────────────────────────────────────────
         k           = min(top_k, len(candidates))
@@ -106,11 +106,11 @@ class CandidateRetriever:
         retrieved   = candidates.iloc[top_indices].reset_index(drop=True)
 
         # Safety check: nếu GT vẫn không có mặt (edge case) → thêm vào
-        if force_include_gt_flight_id is not None:
-            gt_str = str(force_include_gt_flight_id)
-            if not (retrieved["flight_id"].astype(str) == gt_str).any():
-                gt_row = candidates[candidates["flight_id"].astype(str) == gt_str]
-                if not gt_row.empty:
-                    retrieved = pd.concat([gt_row, retrieved], ignore_index=True).head(k)
+        if force_include_gt_flight_ids:
+            for gt_str in force_include_gt_flight_ids:
+                if not (retrieved["flight_id"].astype(str) == gt_str).any():
+                    gt_row = candidates[candidates["flight_id"].astype(str) == gt_str]
+                    if not gt_row.empty:
+                        retrieved = pd.concat([gt_row, retrieved], ignore_index=True).head(k)
 
         return retrieved

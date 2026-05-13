@@ -133,7 +133,8 @@ def run_evaluation(sessions_iter, n_sessions, dl, ranker, flights_df,
 
     for session_id, group in sessions_iter:
         user_id    = str(group["user_id"].iloc[0])
-        sample_fid = str(group["flight_id"].iloc[0])
+        booked_fids = group[group["relevance"] == 1]["flight_id"].astype(str).tolist()
+        sample_fid  = str(group["flight_id"].iloc[0])
 
         if sample_fid not in flights_df.index:
             skipped += 1
@@ -201,6 +202,8 @@ def run_evaluation(sessions_iter, n_sessions, dl, ranker, flights_df,
 
 def run_2stage_evaluation(sessions_iter, n_sessions, dl, ranker, flights_df,
                           retriever, top_k_retrieval, rng, label=""):
+    skip_reasons = {"no_flight_in_index": 0, "no_candidates": 0, 
+                "no_positive_after_rank": 0, "other": 0}
     metric_keys = ["ndcg5", "ndcg10", "prec5", "rec5", "mrr"]
     metrics_store = {k: [] for k in metric_keys}
     processed = 0
@@ -208,10 +211,11 @@ def run_2stage_evaluation(sessions_iter, n_sessions, dl, ranker, flights_df,
 
     for session_id, group in sessions_iter:
         user_id    = str(group["user_id"].iloc[0])
-        sample_fid = str(group["flight_id"].iloc[0])
+        booked_fids = group[group["relevance"] == 1]["flight_id"].astype(str).tolist()
+        sample_fid  = str(group["flight_id"].iloc[0])
 
         if sample_fid not in flights_df.index:
-            skipped += 1
+            skip_reasons["no_flight_in_index"] += 1
             continue
 
         sample_flight = flights_df.loc[sample_fid]
@@ -220,20 +224,20 @@ def run_2stage_evaluation(sessions_iter, n_sessions, dl, ranker, flights_df,
 
         # Stage 1: retrieval with force_include_gt
         candidates = retriever.retrieve(origin, dest, user_id,
-                                        top_k=top_k_retrieval,
-                                        force_include_gt_flight_id=sample_fid)
+                                top_k=top_k_retrieval,
+                                force_include_gt_flight_ids=booked_fids)
         if len(candidates) == 0:
-            skipped += 1
+            skip_reasons["no_candidates"] += 1
             continue
 
         # Stage 2: ranking
-        ranked = ranker.rank(candidates, user_id, top_k=10)
+        ranked = ranker.rank(candidates, user_id, top_k=len(candidates))
         gt_map = {str(fid): int(rel) for fid, rel in zip(group["flight_id"], group["relevance"])}
         labels = np.array([gt_map.get(str(fid), 0) for fid in ranked["flight_id"]])
         scores = ranked["final_score"].values
 
         if np.sum(labels >= 1) == 0:
-            skipped += 1
+            skip_reasons["no_positive_after_rank"] += 1
             continue
 
         metrics = compute_all_metrics(labels, scores)
@@ -243,6 +247,7 @@ def run_2stage_evaluation(sessions_iter, n_sessions, dl, ranker, flights_df,
         if processed % 200 == 0:
             print(f"  [{label}] Đã xử lý {processed:,}/{n_sessions:,}...", end="\r")
 
+    print(f"  Skip reasons: {skip_reasons}")
     print(f"  [{label}] ✓ Hoàn thành: {processed:,} sessions hợp lệ, {skipped:,} bỏ qua")
 
     if processed == 0:

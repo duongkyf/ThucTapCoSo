@@ -159,8 +159,7 @@ class FlightRanker:
         result = candidates.copy()
         result["final_score"] = scores
         mn, mx = result["final_score"].min(), result["final_score"].max()
-        result["final_score"] = ((result["final_score"] - mn) / (mx - mn)
-                                 if mx > mn else 1.0)
+        result["final_score"] = (result["final_score"] - mn) / (mx - mn) if mx > mn else result["final_score"]
         return (result.sort_values("final_score", ascending=False)
                       .head(top_k)
                       .reset_index(drop=True))
