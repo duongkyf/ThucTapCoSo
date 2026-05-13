@@ -1,0 +1,12 @@
+/* ═══════════════════════════════════════════════════════════
+   Admin Styles — barrel import
+   Import file này thay vì import từng file riêng lẻ
+   ═══════════════════════════════════════════════════════════ */
+
+@import './admin-variables.css';      /* CSS vars, base layout          */
+@import './admin-sidebar.css';        /* Sidebar, nav, footer           */
+@import './admin-topbar-kpi.css';     /* Topbar, KPI cards              */
+@import './admin-table.css';          /* Panel, table, toolbar, search  */
+@import './admin-buttons-badges.css'; /* Buttons, badges, tags, utils   */
+@import './admin-charts.css';         /* Charts, donut, bar, sub-tabs   */
+@import './admin-modal.css';          /* Modal, form, confirm dialog    */

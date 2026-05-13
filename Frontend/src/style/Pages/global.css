@@ -1,0 +1,26 @@
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+:root {
+  --navy:      #0a1628;
+  --navy-2:    #131d30;
+  --navy-3:    #1c2b47;
+  --blue:      #1a56db;
+  --blue-2:    #2563eb;
+  --blue-l:    #3b76f6;
+  --sky:       #e0eaff;
+  --accent:    #f97316;
+  --gold:      #f59e0b;
+  --green:     #10b981;
+  --red:       #ef4444;
+  --teal:      #0ea5e9;
+  --white:     #ffffff;
+  --gray-1:    #f1f5f9;
+  --gray-2:    #e2e8f0;
+  --gray-3:    #94a3b8;
+  --gray-4:    #64748b;
+  --text:      #0f172a;
+  --radius:    14px;
+  --shadow:    0 4px 24px rgba(11,17,32,.07);
+  --shadow-lg: 0 12px 40px rgba(11,17,32,.12);
+  --primary:   #1a56db;
+}

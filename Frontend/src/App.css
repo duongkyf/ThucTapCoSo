@@ -1,0 +1,107 @@
+/* ===== App Layout ===== */
+#root {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.app-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.main-content {
+  flex: 1;
+}
+
+/* ===== Modal ===== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ===== Auth Card ===== */
+.auth-card {
+  background: var(--white);
+  padding: 40px;
+  border-radius: var(--radius-lg);
+  width: 90%;
+  max-width: 380px;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+  text-align: center;
+  animation: slideUp 0.25s ease;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.auth-card h2 {
+  margin-bottom: 10px;
+  color: var(--primary);
+}
+
+.auth-card p {
+  font-size: 14px;
+  margin-bottom: 20px;
+  color: #666;
+}
+
+.auth-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.auth-card label {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  display: block;
+  color: #555;
+  text-align: left;
+}
+
+.auth-card input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.auth-card input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.auth-card .btn-primary {
+  margin-top: 10px;
+  padding: 12px;
+  font-size: 16px;
+}
+
+/* ===== Buttons ===== */
+.close-btn {
+  transition: color var(--transition), transform var(--transition);
+}
+
+.close-btn:hover {
+  color: #ff4d4d;
+  transform: scale(1.1);
+}

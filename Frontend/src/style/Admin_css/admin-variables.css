@@ -1,0 +1,41 @@
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap');
+
+/* ═══ CSS VARIABLES ══════════════════════════════════════════ */
+:root {
+  --ad-navy:    #0a1628;
+  --ad-blue:    #1a56db;
+  --ad-blue2:   #2563eb;
+  --ad-teal:    #0ea5e9;
+  --ad-green:   #10b981;
+  --ad-yellow:  #f59e0b;
+  --ad-red:     #ef4444;
+  --ad-purple:  #8b5cf6;
+  --ad-bg:      #f0f4fa;
+  --ad-card:    #ffffff;
+  --ad-border:  #e2e8f0;
+  --ad-text:    #0f172a;
+  --ad-muted:   #64748b;
+  --ad-light:   #f8fafc;
+  --ad-radius:  12px;
+  --ad-font:    'Be Vietnam Pro', sans-serif;
+}
+
+/* ═══ BASE LAYOUT ════════════════════════════════════════════ */
+* { box-sizing: border-box; }
+
+.admin-layout {
+  display: flex;
+  min-height: 100vh;
+  background: var(--ad-bg);
+  font-family: var(--ad-font);
+}
+
+.admin-main {
+  flex: 1;
+  margin-left: 248px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.admin-content-area { padding: 24px; }

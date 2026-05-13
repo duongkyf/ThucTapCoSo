@@ -1,0 +1,167 @@
+/* ═══ PANEL ════════════════════════════════════════════════ */
+.panel-card {
+  background: var(--ad-card);
+  border-radius: var(--ad-radius);
+  border: 1px solid var(--ad-border);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.panel-header {
+  padding: 20px 24px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid #f1f5f9;
+}
+.panel-header h2 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--ad-text);
+  font-weight: 800;
+}
+.panel-subtitle { margin: 3px 0 0; font-size: 12px; color: var(--ad-muted); }
+
+/* ═══ TABLE ════════════════════════════════════════════════ */
+.table-wrapper { overflow-x: auto; }
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  min-width: 600px;
+}
+
+.admin-table thead tr { background: var(--ad-light); }
+
+.admin-table th {
+  padding: 11px 18px;
+  color: var(--ad-muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  border-bottom: 1.5px solid var(--ad-border);
+  white-space: nowrap;
+}
+
+.admin-table td {
+  padding: 13px 18px;
+  font-size: 13.5px;
+  color: #334155;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.admin-table tbody tr { transition: background 0.12s; }
+.admin-table tbody tr:hover { background: #f0f6ff; }
+.admin-table tbody tr:last-child td { border-bottom: none; }
+
+.admin-table .row-pending       { background: #fffbeb; }
+.admin-table .row-pending:hover { background: #fef3c7; }
+.admin-table .row-banned        { opacity: 0.65; }
+
+.admin-table .empty-row {
+  text-align: center;
+  color: var(--ad-muted);
+  padding: 48px;
+  font-size: 14px;
+}
+.admin-table .empty-row i { display: block; font-size: 28px; margin-bottom: 8px; opacity: 0.4; }
+
+/* ─── Cell helpers ───────────────────────────────────────── */
+.cell-primary { font-weight: 700; color: var(--ad-text); }
+.cell-meta    { font-size: 11.5px; color: var(--ad-muted); margin-top: 2px; }
+
+/* ─── Avatar in table ────────────────────────────────────── */
+.tbl-avatar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.tbl-avatar-img {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 2px solid var(--ad-border);
+}
+.tbl-avatar-initials {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+/* ═══ TOOLBAR ═══════════════════════════════════════════════ */
+.panel-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 24px;
+  gap: 12px;
+  background: var(--ad-light);
+  border-bottom: 1px solid var(--ad-border);
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.search-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1.5px solid var(--ad-border);
+  border-radius: 8px;
+  padding: 0 12px;
+  height: 38px;
+  background: var(--ad-card);
+  flex: 1;
+  max-width: 360px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.search-input-wrap:focus-within {
+  border-color: var(--ad-blue2);
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+}
+.search-input-wrap i { color: #94a3b8; font-size: 13px; flex-shrink: 0; }
+.search-input-wrap input {
+  border: none; outline: none;
+  background: transparent;
+  font-size: 13.5px;
+  font-family: var(--ad-font);
+  color: var(--ad-text);
+  flex: 1;
+}
+.search-input-wrap input::placeholder { color: #94a3b8; }
+
+.clear-search {
+  background: none; border: none;
+  cursor: pointer; color: #94a3b8;
+  padding: 0; font-size: 13px;
+  transition: color 0.15s;
+}
+.clear-search:hover { color: var(--ad-muted); }
+
+.filter-select {
+  height: 38px; padding: 0 12px;
+  border: 1.5px solid var(--ad-border);
+  border-radius: 8px;
+  background: var(--ad-card);
+  color: var(--ad-muted);
+  font-size: 13px;
+  font-family: var(--ad-font);
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.filter-select:focus { border-color: var(--ad-blue2); }
