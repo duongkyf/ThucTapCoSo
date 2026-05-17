@@ -45,7 +45,6 @@ const Admin = ({ user, onLogout }) => {
 
   const isSuperAdmin   = user?.role === 'SUPER_ADMIN';
   const navItems       = isSuperAdmin ? SUPER_ADMIN_NAV : AIRLINE_ADMIN_NAV;
-  // Nếu tab hiện tại không thuộc navItems (vd: airline admin cố vào /airlines) → fallback
   const safeTab        = navItems.find(n => n.tab === tab) ? tab : 'overview';
   const roleLabel      = isSuperAdmin ? 'Admin' : 'Staff';
   const roleBadgeColor = isSuperAdmin ? '#3b82f6' : '#f59e0b';

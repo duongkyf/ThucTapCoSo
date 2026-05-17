@@ -27,21 +27,26 @@ const getInitials = (name = '') => {
 // ─── Personal Tab ──────────────────────────────────────────────
 const PersonalTab = ({ user, setUser }) => {
   const [form, setForm] = useState({
-    username:      user?.username      || '',
-    phone_number:  user?.phone_number  || '',
-    id_number:     user?.id_number     || '',
-    date_of_birth: user?.date_of_birth
-      ? new Date(user.date_of_birth).toISOString().split('T')[0]
-      : '',
+    username:     user?.username     || '',
+    phone_number: user?.phone_number || '',
+    id_number:    user?.id_number    || '',
   });
   const [editing, setEditing] = useState(false);
   const [saving,  setSaving]  = useState(false);
   const [msg,     setMsg]     = useState('');
 
   const handleSave = useCallback(async () => {
-    setSaving(true); setMsg('');
+    setSaving(true);
+    setMsg('');
     try {
-      await authService.updateProfile(form);
+      const apiPayload = {
+        username:     form.username,
+        phone_number: form.phone_number,
+        id_number:    form.id_number,
+      };
+
+      await authService.updateProfile(apiPayload);
+
       const updated = { ...user, ...form };
       setUser(updated);
       localStorage.setItem('skybooker_user', JSON.stringify(updated));
@@ -49,8 +54,21 @@ const PersonalTab = ({ user, setUser }) => {
       setEditing(false);
     } catch (err) {
       setMsg('error:' + (err.response?.data?.message || 'Lỗi cập nhật'));
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   }, [form, user, setUser]);
+
+  const handleCancel = useCallback(() => {
+    // Reset form to current saved user data
+    setForm({
+      username:     user?.username     || '',
+      phone_number: user?.phone_number || '',
+      id_number:    user?.id_number    || '',
+    });
+    setEditing(false);
+    setMsg('');
+  }, [user]);
 
   const msgType = msg.startsWith('success') ? 'success' : 'error';
   const msgText = msg.split(':').slice(1).join(':');
@@ -60,12 +78,19 @@ const PersonalTab = ({ user, setUser }) => {
       <div className="content-header">
         <h2>Thông tin cá nhân</h2>
         {!editing
-          ? <button className="btn-edit-toggle" onClick={() => setEditing(true)}><i className="fas fa-edit" /> Chỉnh sửa</button>
-          : <button className="btn-cancel-toggle" onClick={() => { setEditing(false); setMsg(''); }}>Hủy</button>
+          ? <button className="btn-edit-toggle" onClick={() => setEditing(true)}>
+              <i className="fas fa-edit" /> Chỉnh sửa
+            </button>
+          : <button className="btn-cancel-toggle" onClick={handleCancel}>Hủy</button>
         }
       </div>
 
-      {msg && <div className={`profile-msg ${msgType}`}><i className={`fas fa-${msgType === 'success' ? 'check-circle' : 'exclamation-circle'}`} /> {msgText}</div>}
+      {msg && (
+        <div className={`profile-msg ${msgType}`}>
+          <i className={`fas fa-${msgType === 'success' ? 'check-circle' : 'exclamation-circle'}`} />
+          {' '}{msgText}
+        </div>
+      )}
 
       <div className="profile-form">
         <div className="form-row">
@@ -73,8 +98,12 @@ const PersonalTab = ({ user, setUser }) => {
             <label>Họ và tên</label>
             <div className={`input-icon-wrap ${editing ? 'editable' : ''}`}>
               <i className="fas fa-user" />
-              <input type="text" value={form.username} disabled={!editing}
-                onChange={e => setForm(p => ({ ...p, username: e.target.value }))} />
+              <input
+                type="text"
+                value={form.username}
+                disabled={!editing}
+                onChange={e => setForm(p => ({ ...p, username: e.target.value }))}
+              />
             </div>
           </div>
           <div className="form-group">
@@ -91,43 +120,36 @@ const PersonalTab = ({ user, setUser }) => {
             <label>Số điện thoại</label>
             <div className={`input-icon-wrap ${editing ? 'editable' : ''}`}>
               <i className="fas fa-phone" />
-              <input type="text" value={form.phone_number} placeholder="0912 345 678" disabled={!editing}
-                onChange={e => setForm(p => ({ ...p, phone_number: e.target.value }))} />
+              <input
+                type="text"
+                value={form.phone_number}
+                placeholder="0912 345 678"
+                disabled={!editing}
+                onChange={e => setForm(p => ({ ...p, phone_number: e.target.value }))}
+              />
             </div>
           </div>
           <div className="form-group">
             <label>CCCD / Hộ chiếu</label>
             <div className={`input-icon-wrap ${editing ? 'editable' : ''}`}>
               <i className="fas fa-id-card" />
-              <input type="text" value={form.id_number} placeholder="012345678901" disabled={!editing}
-                onChange={e => setForm(p => ({ ...p, id_number: e.target.value }))} />
+              <input
+                type="text"
+                value={form.id_number}
+                placeholder="012345678901"
+                disabled={!editing}
+                onChange={e => setForm(p => ({ ...p, id_number: e.target.value }))}
+              />
             </div>
           </div>
         </div>
 
-        <div className="form-row">
-          <div className="form-group">
-            <label>Ngày sinh</label>
-            <div className={`input-icon-wrap ${editing ? 'editable' : ''}`}>
-              <i className="fas fa-calendar-alt" />
-              <input type="date" value={form.date_of_birth} disabled={!editing}
-                onChange={e => setForm(p => ({ ...p, date_of_birth: e.target.value }))} />
-            </div>
-          </div>
-          <div className="form-group">
-            <label>Ngày tạo tài khoản</label>
-            <div className="input-icon-wrap">
-              <i className="fas fa-clock" />
-              <input type="text"
-                value={user?.created_at ? new Date(user.created_at).toLocaleDateString('vi-VN') : ''}
-                disabled />
-            </div>
-          </div>
-        </div>
 
         {editing && (
           <button className="btn-save-profile" onClick={handleSave} disabled={saving}>
-            {saving ? <><i className="fas fa-spinner fa-spin" /> Đang lưu...</> : <><i className="fas fa-save" /> Lưu thay đổi</>}
+            {saving
+              ? <><i className="fas fa-spinner fa-spin" /> Đang lưu...</>
+              : <><i className="fas fa-save" /> Lưu thay đổi</>}
           </button>
         )}
       </div>
@@ -136,23 +158,28 @@ const PersonalTab = ({ user, setUser }) => {
 };
 
 // ─── Security Tab ──────────────────────────────────────────────
-const SecurityTab = ({ onLogout }) => {
+const SecurityTab = () => {
   const [form, setForm]     = useState(EMPTY_PWD);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg]       = useState('');
 
   const handleSave = useCallback(async () => {
-    if (form.new_password !== form.confirmPassword) { setMsg('error:Mật khẩu xác nhận không khớp'); return; }
+    if (!form.current_password)                      { setMsg('error:Vui lòng nhập mật khẩu hiện tại'); return; }
     if (form.new_password.length < 6)               { setMsg('error:Mật khẩu mới phải có ít nhất 6 ký tự'); return; }
     if (/^(.)\1+$/.test(form.new_password))          { setMsg('error:Mật khẩu quá đơn giản'); return; }
-    setSaving(true); setMsg('');
+    if (form.new_password !== form.confirmPassword)  { setMsg('error:Mật khẩu xác nhận không khớp'); return; }
+
+    setSaving(true);
+    setMsg('');
     try {
       await authService.changePassword(form.current_password, form.new_password);
       setMsg('success:Đổi mật khẩu thành công!');
       setForm(EMPTY_PWD);
     } catch (err) {
       setMsg('error:' + (err.response?.data?.message || 'Lỗi đổi mật khẩu'));
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   }, [form]);
 
   const msgType = msg.startsWith('success') ? 'success' : 'error';
@@ -161,7 +188,12 @@ const SecurityTab = ({ onLogout }) => {
   return (
     <div className="tab-content">
       <div className="content-header"><h2>Đổi mật khẩu</h2></div>
-      {msg && <div className={`profile-msg ${msgType}`}><i className={`fas fa-${msgType === 'success' ? 'check-circle' : 'exclamation-circle'}`} /> {msgText}</div>}
+      {msg && (
+        <div className={`profile-msg ${msgType}`}>
+          <i className={`fas fa-${msgType === 'success' ? 'check-circle' : 'exclamation-circle'}`} />
+          {' '}{msgText}
+        </div>
+      )}
       <div className="profile-form">
         {[
           { key: 'current_password', label: 'Mật khẩu hiện tại',     icon: 'fa-lock'         },
@@ -172,16 +204,19 @@ const SecurityTab = ({ onLogout }) => {
             <label>{label}</label>
             <div className="input-icon-wrap editable">
               <i className={`fas ${icon}`} />
-              <input type="password" value={form[key]}
-                onChange={e => { setMsg(''); setForm(p => ({ ...p, [key]: e.target.value })); }} />
+              <input
+                type="password"
+                value={form[key]}
+                onChange={e => { setMsg(''); setForm(p => ({ ...p, [key]: e.target.value })); }}
+              />
             </div>
           </div>
         ))}
         <button className="btn-save-profile" onClick={handleSave} disabled={saving}>
-          {saving ? <><i className="fas fa-spinner fa-spin" /> Đang lưu...</> : <><i className="fas fa-lock" /> Đổi mật khẩu</>}
+          {saving
+            ? <><i className="fas fa-spinner fa-spin" /> Đang lưu...</>
+            : <><i className="fas fa-lock" /> Đổi mật khẩu</>}
         </button>
-
-
       </div>
     </div>
   );
@@ -222,18 +257,27 @@ const Profile = ({ user, setUser, onLogout }) => {
                 ? <img src={avatarSrc} alt={name} className="sidebar-avatar-img" />
                 : <div className="sidebar-avatar-initials" style={{ background: avatarBg }}>{initials}</div>
               }
-              <div className="avatar-edit-overlay"><i className="fas fa-camera" /><span>Đổi ảnh</span></div>
+              <div className="avatar-edit-overlay">
+                <i className="fas fa-camera" /><span>Đổi ảnh</span>
+              </div>
             </div>
-            <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={handleAvatarChange}
+            />
             <h3>{name}</h3>
             <p>{user?.email}</p>
           </div>
 
           <nav className="profile-nav">
             {TABS.map(({ id, label, icon }) => (
-              <button key={id}
+              <button
+                key={id}
                 className={`profile-nav-item ${tab === id ? 'active' : ''}`}
-                onClick={() => { if (id === 'history') { navigate('/history'); } else setTab(id); }}
+                onClick={() => id === 'history' ? navigate('/history') : setTab(id)}
               >
                 <i className={icon} /> {label}
               </button>
@@ -249,7 +293,7 @@ const Profile = ({ user, setUser, onLogout }) => {
 
         <main className="profile-main">
           {tab === 'personal' && <PersonalTab user={user} setUser={setUser} />}
-          {tab === 'security' && <SecurityTab onLogout={onLogout} />}
+          {tab === 'security' && <SecurityTab />}
         </main>
       </div>
     </div>

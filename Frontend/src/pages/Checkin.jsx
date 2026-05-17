@@ -1,49 +1,70 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { bookingService } from '../services/booking.service';
 import api from '../services/api';
 import { fmtDate } from '../utils/dateUtils';
 import '../style/Pages/Checkin.css';
 
-// Module-level cache ghế đã check-in trong session
-const localOccupiedCache = {};
-const addToCache = (flightId, seatCode) => {
+// ── Session-scoped seat cache ────────────────────────────────
+// Keyed by flightId; cleared when component unmounts (useRef-based per instance)
+const _sessionCache = {};
+const addToCache  = (flightId, seatCode) => {
   if (!flightId || !seatCode) return;
-  if (!localOccupiedCache[flightId]) localOccupiedCache[flightId] = new Set();
-  localOccupiedCache[flightId].add(seatCode.toUpperCase());
+  if (!_sessionCache[flightId]) _sessionCache[flightId] = new Set();
+  _sessionCache[flightId].add(seatCode.toUpperCase());
 };
-const getCached = (flightId) => localOccupiedCache[flightId] || new Set();
+const getCached = (flightId) => (_sessionCache[flightId] ? new Set(_sessionCache[flightId]) : new Set());
 
+// ── Constants ────────────────────────────────────────────────
 const SEAT_ROWS = {
   first:    { rows: 2,  cols: ['A','B','C','D'],         label: 'Hạng nhất',  color: '#b7791f' },
   business: { rows: 4,  cols: ['A','B','C','D'],         label: 'Thương gia', color: '#2b6cb0' },
   economy:  { rows: 16, cols: ['A','B','C','D','E','F'], label: 'Phổ thông',  color: '#276749' },
 };
-const CLASS_MAP = { first: 'first', business: 'business', eco: 'economy', economy: 'economy', premium: 'economy' };
+
+// FIX: normalise all possible class strings the API might return
+const CLASS_MAP = {
+  first:    'first',
+  '1':      'first',
+  business: 'business',
+  biz:      'business',
+  '2':      'business',
+  eco:      'economy',
+  economy:  'economy',
+  economic: 'economy',
+  premium:  'economy',
+  '3':      'economy',
+};
+
+const normaliseClass = (cls) => CLASS_MAP[(cls || '').toLowerCase()] || 'economy';
+
+// FIX: regex now correctly captures multi-digit row number then letter(s)
 const parseSeat = (code = '') => {
-  const m = code.match(/^(\d+)([A-F]+)$/i);
-  return m ? { row: parseInt(m[1]), col: m[2].toUpperCase() } : null;
+  const m = String(code).match(/^(\d+)([A-F])$/i);
+  return m ? { row: parseInt(m[1], 10), col: m[2].toUpperCase() } : null;
 };
 
 const SAFETY_RULES = [
-  'Hành lý xách tay tối đa 7kg, kích thước 56×36×23cm',
-  'Không mang chất lỏng vượt quá 100ml, chất cháy nổ hoặc vật sắc nhọn',
+  'Hành lý xách tay tối đa 7 kg, kích thước 56 × 36 × 23 cm',
+  'Không mang chất lỏng vượt quá 100 ml, chất cháy nổ hoặc vật sắc nhọn',
   'Tắt thiết bị điện tử hoặc bật chế độ máy bay khi được yêu cầu',
   'Thông tin hành khách phải khớp với giấy tờ tùy thân khi check-in',
   'Đồng ý với điều khoản vận chuyển của SkyBooker Airlines',
 ];
 
-// ── Seat Map ──────────────────────────────────────────────────
+// ── SeatMap ──────────────────────────────────────────────────
 const SeatMap = ({ cls, flightId, seats, seatsLoading, selectedSeat, onSelect }) => {
-  const key    = CLASS_MAP[cls] || 'economy';
+  const key    = normaliseClass(cls);
   const config = SEAT_ROWS[key];
-  const aisleAt = config.cols.length === 6 ? 3 : config.cols.length === 4 ? 2 : null;
+  // Aisle after index 2 for 6-col, after index 1 for 4-col
+  const aisleAt = config.cols.length === 6 ? 2 : config.cols.length === 4 ? 2 : null;
 
+  // FIX: rebuild when seats OR flightId changes (flightId was missing from deps before)
   const occupiedSet = useMemo(() => {
-    const s = new Set(getCached(flightId));
+    const s = getCached(flightId);
     (seats || []).forEach(seat => {
       if (!seat.is_occupied) return;
+      const sc = normaliseClass(seat.seat_class);
       const p  = parseSeat(seat.seat_code);
-      const sc = CLASS_MAP[seat.seat_class] || seat.seat_class;
       if (p && sc === key) s.add(seat.seat_code.toUpperCase());
     });
     return s;
@@ -52,7 +73,7 @@ const SeatMap = ({ cls, flightId, seats, seatsLoading, selectedSeat, onSelect })
   const seatLookup = useMemo(() => {
     const map = {};
     (seats || []).forEach(seat => {
-      const sc = CLASS_MAP[seat.seat_class] || seat.seat_class;
+      const sc = normaliseClass(seat.seat_class);
       const p  = parseSeat(seat.seat_code);
       if (p && sc === key) map[`${p.row}${p.col}`] = seat;
     });
@@ -60,16 +81,16 @@ const SeatMap = ({ cls, flightId, seats, seatsLoading, selectedSeat, onSelect })
   }, [seats, key]);
 
   const actualRows = useMemo(() => {
-    if (!seats?.length) return Array.from({ length: config.rows }, (_, i) => i + 1);
-    const rowSet = new Set();
-    seats.forEach(seat => {
-      const sc = CLASS_MAP[seat.seat_class] || seat.seat_class;
-      const p  = parseSeat(seat.seat_code);
-      if (p && sc === key) rowSet.add(p.row);
-    });
-    return rowSet.size > 0
-      ? [...rowSet].sort((a, b) => a - b)
-      : Array.from({ length: config.rows }, (_, i) => i + 1);
+    if (seats?.length) {
+      const rowSet = new Set();
+      seats.forEach(seat => {
+        const sc = normaliseClass(seat.seat_class);
+        const p  = parseSeat(seat.seat_code);
+        if (p && sc === key) rowSet.add(p.row);
+      });
+      if (rowSet.size > 0) return [...rowSet].sort((a, b) => a - b);
+    }
+    return Array.from({ length: config.rows }, (_, i) => i + 1);
   }, [seats, key, config.rows]);
 
   if (seatsLoading) return (
@@ -83,12 +104,13 @@ const SeatMap = ({ cls, flightId, seats, seatsLoading, selectedSeat, onSelect })
     <div className="seatmap-wrap">
       <div className="seatmap-legend">
         {[
-          { bg: config.color,  label: 'Ghế của bạn' },
-          { bg: '#e2e8f0',     label: 'Trống'        },
-          { bg: '#fc8181',     label: 'Đã đặt'       },
+          { bg: config.color, label: 'Ghế của bạn' },
+          { bg: '#e2e8f0',    label: 'Trống'        },
+          { bg: '#fc8181',    label: 'Đã đặt'       },
         ].map(l => (
           <div className="legend-item" key={l.label}>
-            <div className="legend-dot" style={{ background: l.bg }} /><span>{l.label}</span>
+            <div className="legend-dot" style={{ background: l.bg }} />
+            <span>{l.label}</span>
           </div>
         ))}
       </div>
@@ -97,7 +119,7 @@ const SeatMap = ({ cls, flightId, seats, seatsLoading, selectedSeat, onSelect })
         <div className="plane-nose" />
         <div className="seatmap-rows">
 
-          {/* Header hàng cột — row-num ẩn để căn đều với seat-row */}
+          {/* Column headers */}
           <div className="seatmap-cols-header">
             <div className="row-num" style={{ opacity: 0 }} aria-hidden="true">0</div>
             {config.cols.map((c, i) => (
@@ -115,17 +137,33 @@ const SeatMap = ({ cls, flightId, seats, seatsLoading, selectedSeat, onSelect })
               {config.cols.map((col, ci) => {
                 const posKey     = `${rowNum}${col}`;
                 const seatObj    = seatLookup[posKey];
+                // FIX: prefer seat_code from API so we don't fabricate unknown codes
                 const seatCode   = seatObj ? seatObj.seat_code : posKey;
                 const isYours    = selectedSeat === seatCode;
                 const isOccupied = !isYours && occupiedSet.has(seatCode.toUpperCase());
+                const isMissing  = !seatObj;          // seat not in API response → treat as taken
+                const disabled   = isOccupied || isMissing;
+
                 return (
                   <React.Fragment key={col}>
                     {aisleAt && ci === aisleAt && <div className="aisle-spacer" />}
                     <div
-                      className={`seat ${isYours ? 'seat-yours' : isOccupied ? 'seat-taken' : 'seat-free'}`}
+                      className={`seat ${isYours ? 'seat-yours' : disabled ? 'seat-taken' : 'seat-free'}`}
                       style={isYours ? { background: config.color, borderColor: config.color } : {}}
-                      onClick={() => !isOccupied && onSelect(seatCode)}
-                      title={isYours ? `${seatCode} — Đã chọn` : isOccupied ? `${seatCode} — Đã được đặt` : `${seatCode} — Nhấn để chọn`}
+                      onClick={() => !disabled && onSelect(seatCode)}
+                      role="button"
+                      tabIndex={disabled ? -1 : 0}
+                      onKeyDown={(e) => e.key === 'Enter' && !disabled && onSelect(seatCode)}
+                      aria-label={
+                        isYours   ? `Ghế ${seatCode} – Đã chọn`   :
+                        disabled  ? `Ghế ${seatCode} – Đã đặt`    :
+                                    `Ghế ${seatCode} – Nhấn để chọn`
+                      }
+                      title={
+                        isYours   ? `${seatCode} — Đã chọn`  :
+                        disabled  ? `${seatCode} — Đã được đặt` :
+                                    `${seatCode} — Nhấn để chọn`
+                      }
                     >
                       {isYours && <i className="fas fa-user" style={{ fontSize: 8, pointerEvents: 'none' }} />}
                     </div>
@@ -150,70 +188,126 @@ const SeatMap = ({ cls, flightId, seats, seatsLoading, selectedSeat, onSelect })
   );
 };
 
-// ── Main Component ────────────────────────────────────────────
+// ── Main Component ───────────────────────────────────────────
 const Checkin = () => {
   const [form,         setForm]         = useState({ booking_ref: '' });
   const [loading,      setLoading]      = useState(false);
   const [seatsLoading, setSeatsLoading] = useState(false);
   const [error,        setError]        = useState('');
-  const [result,       setResult]       = useState(null);   // dữ liệu booking (chưa checkin)
+  const [result,       setResult]       = useState(null);
   const [seats,        setSeats]        = useState([]);
   const [selectedSeat, setSelectedSeat] = useState(null);
   const [agreed,       setAgreed]       = useState(false);
   const [rulesOpen,    setRulesOpen]    = useState(false);
   const [confirmed,    setConfirmed]    = useState(false);
 
+  // FIX: use ref to cancel in-flight seat fetch on unmount / re-search
+  const seatsAbortRef = useRef(null);
+
   const canConfirm = agreed && !!selectedSeat;
 
-  // Load danh sách ghế sau khi tìm thấy booking
+  // Load seat map after a booking is found
   useEffect(() => {
     if (!result?.flight_id) return;
+
+    // Cancel previous request if still in flight
+    seatsAbortRef.current?.abort();
+    seatsAbortRef.current = new AbortController();
+
     setSeatsLoading(true);
-    // Truyền departure_date để scope ghế đúng ngày (recurring flights)
-    const date = result.departure_time
+    setSeats([]);
+
+    const date  = result.departure_time
       ? new Date(result.departure_time).toISOString().slice(0, 10)
       : '';
     const query = date ? `?date=${date}` : '';
-    api.get(`/flights/${result.flight_id}/seats${query}`)
-      .then(res => setSeats(res.data?.data || []))
-      .catch(() => setSeats([]))
-      .finally(() => setSeatsLoading(false));
-  }, [result?.flight_id]);
 
-  // ── Bước 1: Tra cứu — KHÔNG cập nhật DB ─────────────────────
+    api.get(`/flights/${result.flight_id}/seats${query}`, {
+      signal: seatsAbortRef.current.signal,
+    })
+      .then(res => setSeats(res.data?.data || []))
+      .catch(err => {
+        if (err.name !== 'CanceledError' && err.name !== 'AbortError') {
+          console.error('Seat fetch failed:', err);
+          setSeats([]);
+        }
+      })
+      .finally(() => setSeatsLoading(false));
+
+    return () => seatsAbortRef.current?.abort();
+  }, [result?.flight_id, result?.departure_time]);
+
+  // ── Step 1: lookup — read-only, no DB write ──────────────────
   const handleSearch = useCallback(async () => {
-    if (!form.booking_ref.trim()) { setError('Vui lòng nhập mã đặt chỗ'); return; }
-    setLoading(true); setError(''); setResult(null);
+    const ref = form.booking_ref.trim().toUpperCase();
+    if (!ref) { setError('Vui lòng nhập mã đặt chỗ'); return; }
+
+    setLoading(true);
+    setError('');
+    setResult(null);
+    setSelectedSeat(null);
+
     try {
-      const res  = await bookingService.lookup(form.booking_ref.toUpperCase());
+      const res  = await bookingService.lookup(ref);
       const data = res.data?.data;
       if (!data) throw new Error('Không tìm thấy thông tin đặt vé');
+
+      // FIX: guard against already-checked-in bookings
+      if (data.checked_in) {
+        setError('Mã đặt chỗ này đã được check-in trước đó');
+        return;
+      }
+
       setResult(data);
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Không tìm thấy thông tin đặt vé');
-    } finally { setLoading(false); }
-  }, [form]);
+      setError(
+        err.response?.data?.message ||
+        err.message ||
+        'Không tìm thấy thông tin đặt vé'
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [form.booking_ref]);
 
-  // ── Bước 2: Xác nhận → mới gọi checkin, cập nhật DB ─────────
+  // ── Step 2: confirm → write to DB ───────────────────────────
   const handleConfirm = useCallback(async () => {
     if (!canConfirm) return;
-    setLoading(true); setError('');
+    setLoading(true);
+    setError('');
+
     try {
-      await bookingService.checkin({ booking_ref: result.booking_ref });
+      // FIX: send selected seat to backend so it is persisted
+      await bookingService.checkin({
+        booking_ref: result.booking_ref,
+        seat_code:   selectedSeat,
+      });
       addToCache(result.flight_id, selectedSeat);
       setConfirmed(true);
     } catch (err) {
-      setError(err.response?.data?.message || 'Xác nhận check-in thất bại, vui lòng thử lại');
-    } finally { setLoading(false); }
+      setError(
+        err.response?.data?.message ||
+        'Xác nhận check-in thất bại, vui lòng thử lại'
+      );
+    } finally {
+      setLoading(false);
+    }
   }, [canConfirm, result, selectedSeat]);
 
   const handleReset = useCallback(() => {
-    setForm({ booking_ref: '' }); setResult(null); setSeats([]);
-    setSelectedSeat(null); setAgreed(false); setRulesOpen(false);
-    setConfirmed(false); setError('');
+    seatsAbortRef.current?.abort();
+    setForm({ booking_ref: '' });
+    setResult(null);
+    setSeats([]);
+    setSelectedSeat(null);
+    setAgreed(false);
+    setRulesOpen(false);
+    setConfirmed(false);
+    setError('');
   }, []);
 
-  const cls      = CLASS_MAP[result?.class] || 'economy';
+  // FIX: derive class safely with fallback
+  const cls      = normaliseClass(result?.class || result?.seat_class);
   const clsLabel = SEAT_ROWS[cls]?.label || result?.class || '';
 
   const flightItems = result ? [
@@ -226,13 +320,13 @@ const Checkin = () => {
   ] : [];
 
   const bpDetails = result ? [
-    { label: 'PASSENGER',   value: result.passenger_name || '—' },
-    { label: 'AIRLINE',     value: result.airline_name || result.airline_code || '—' },
-    { label: 'FLIGHT',      value: result.flight_code },
-    { label: 'DATE',        value: fmtDate(result.departure_time) },
-    { label: 'CLASS',       value: clsLabel },
-    { label: 'SEAT',        value: selectedSeat || result.seat_code || 'TBD' },
-    { label: 'BOOKING REF', value: result.booking_ref },
+    { label: 'PASSENGER',   value: result.passenger_name || '—'                                    },
+    { label: 'AIRLINE',     value: result.airline_name || result.airline_code || '—'               },
+    { label: 'FLIGHT',      value: result.flight_code                                              },
+    { label: 'DATE',        value: fmtDate(result.departure_time)                                  },
+    { label: 'CLASS',       value: clsLabel                                                        },
+    { label: 'SEAT',        value: selectedSeat || result.seat_code || 'TBD'                       },
+    { label: 'BOOKING REF', value: result.booking_ref                                              },
   ] : [];
 
   return (
@@ -244,21 +338,28 @@ const Checkin = () => {
 
       <div className="checkin-container">
 
-        {/* ── Bước 1: Tìm kiếm ── */}
+        {/* ── Step 1: Search ── */}
         {!result && (
           <div className="checkin-form-card">
             <h2>Nhập thông tin đặt vé</h2>
             <div className="ci-form-group">
-              <label>MÃ ĐẶT CHỖ *</label>
+              <label htmlFor="booking_ref">MÃ ĐẶT CHỖ *</label>
               <input
+                id="booking_ref"
                 type="text"
                 placeholder="VD: BK-XY82A"
                 value={form.booking_ref}
                 onChange={(e) => { setError(''); setForm({ booking_ref: e.target.value }); }}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                onKeyDown={(e) => e.key === 'Enter' && !loading && handleSearch()}
+                autoComplete="off"
+                autoCapitalize="characters"
               />
             </div>
-            {error && <div className="ci-error"><i className="fas fa-exclamation-circle" /> {error}</div>}
+            {error && (
+              <div className="ci-error">
+                <i className="fas fa-exclamation-circle" /> {error}
+              </div>
+            )}
             <button className="btn-checkin" onClick={handleSearch} disabled={loading}>
               {loading
                 ? <><i className="fas fa-spinner fa-spin" /> Đang kiểm tra...</>
@@ -267,7 +368,7 @@ const Checkin = () => {
           </div>
         )}
 
-        {/* ── Bước 2: Chọn ghế + xác nhận ── */}
+        {/* ── Step 2: Seat selection + confirm ── */}
         {result && !confirmed && (
           <div className="safety-card">
             <div className="safety-header">
@@ -292,7 +393,7 @@ const Checkin = () => {
               <h3><i className="fas fa-th" /> Chọn ghế ngồi — {clsLabel}</h3>
               <p className="seatmap-sub">Ghế đỏ đã có người đặt · Nhấn ghế trống để chọn chỗ ngồi</p>
               <SeatMap
-                cls={result.class}
+                cls={result.class || result.seat_class}
                 flightId={result.flight_id}
                 seats={seats}
                 seatsLoading={seatsLoading}
@@ -309,30 +410,49 @@ const Checkin = () => {
                   </div>
                   <span>Tôi đã đọc và đồng ý với tất cả quy định an toàn bay</span>
                 </label>
-                <button className="sa-toggle" onClick={() => setRulesOpen(o => !o)} title={rulesOpen ? 'Thu gọn' : 'Xem chi tiết'}>
+                <button
+                  className="sa-toggle"
+                  onClick={() => setRulesOpen(o => !o)}
+                  aria-expanded={rulesOpen}
+                  title={rulesOpen ? 'Thu gọn' : 'Xem chi tiết'}
+                >
                   <i className={`fas fa-chevron-${rulesOpen ? 'up' : 'down'}`} />
                 </button>
               </div>
               {rulesOpen && (
                 <ul className="sa-list">
-                  {SAFETY_RULES.map((r, i) => <li key={i}><i className="fas fa-check-circle" />{r}</li>)}
+                  {SAFETY_RULES.map((r, i) => (
+                    <li key={i}><i className="fas fa-check-circle" />{r}</li>
+                  ))}
                 </ul>
               )}
             </div>
 
-            {(!selectedSeat || !agreed) && (selectedSeat || agreed) && (
+            {/* Hint: show only when one condition is met but not the other */}
+            {((!selectedSeat && agreed) || (selectedSeat && !agreed)) && (
               <div className="ci-hint">
                 <i className="fas fa-info-circle" />
-                {!selectedSeat ? 'Vui lòng chọn ghế ngồi để tiếp tục' : 'Vui lòng xác nhận quy định an toàn'}
+                {!selectedSeat
+                  ? 'Vui lòng chọn ghế ngồi để tiếp tục'
+                  : 'Vui lòng xác nhận quy định an toàn'}
               </div>
             )}
-            {error && <div className="ci-error"><i className="fas fa-exclamation-circle" /> {error}</div>}
+
+            {error && (
+              <div className="ci-error">
+                <i className="fas fa-exclamation-circle" /> {error}
+              </div>
+            )}
 
             <div className="safety-actions">
-              <button className="btn-back" onClick={handleReset}>
+              <button className="btn-back" onClick={handleReset} disabled={loading}>
                 <i className="fas fa-arrow-left" /> Quay lại
               </button>
-              <button className="btn-confirm" disabled={!canConfirm || loading} onClick={handleConfirm}>
+              <button
+                className="btn-confirm"
+                disabled={!canConfirm || loading}
+                onClick={handleConfirm}
+              >
                 {loading
                   ? <><i className="fas fa-spinner fa-spin" /> Đang xử lý...</>
                   : <><i className="fas fa-check-circle" /> {canConfirm ? `Xác nhận Check-in — Ghế ${selectedSeat}` : 'Xác nhận Check-in'}</>}
@@ -341,7 +461,7 @@ const Checkin = () => {
           </div>
         )}
 
-        {/* ── Bước 3: Boarding pass ── */}
+        {/* ── Step 3: Boarding pass ── */}
         {result && confirmed && (
           <div className="checkin-result">
             <div className="ci-success-banner">
@@ -355,28 +475,39 @@ const Checkin = () => {
             <div className="boarding-pass">
               <div className="bp-header">
                 <div className="bp-logo">
-                  {result.airline_logo
-                    ? <img src={result.airline_logo} alt={result.airline_name}
-                        style={{ height: 28, maxWidth: 100, objectFit: 'contain', filter: 'brightness(0) invert(1)' }}
-                        onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
-                      />
-                    : null}
+                  {result.airline_logo ? (
+                    <img
+                      src={result.airline_logo}
+                      alt={result.airline_name}
+                      style={{ height: 28, maxWidth: 100, objectFit: 'contain', filter: 'brightness(0) invert(1)' }}
+                      onError={e => {
+                        e.target.style.display = 'none';
+                        e.target.nextSibling.style.display = 'flex';
+                      }}
+                    />
+                  ) : null}
                   <span style={{ display: result.airline_logo ? 'none' : 'flex', alignItems: 'center', gap: 6 }}>
                     <i className="fas fa-plane" /> {result.airline_name || 'SkyBooker'}
                   </span>
-                  {result.airline_code && <span style={{ fontSize: 11, opacity: 0.7, marginLeft: 4 }}>{result.airline_code}</span>}
+                  {result.airline_code && (
+                    <span style={{ fontSize: 11, opacity: 0.7, marginLeft: 4 }}>{result.airline_code}</span>
+                  )}
                 </div>
                 <div className="bp-title">BOARDING PASS</div>
               </div>
 
               <div className="bp-route">
                 <div className="bp-point">
-                  <div className="bp-iata">{result.origin_iata || result.origin_city?.substring(0,3).toUpperCase()}</div>
+                  <div className="bp-iata">
+                    {result.origin_iata || result.origin_city?.substring(0, 3).toUpperCase()}
+                  </div>
                   <div className="bp-city">{result.origin_city}</div>
                 </div>
                 <div className="bp-arrow"><i className="fas fa-plane" /></div>
                 <div className="bp-point right">
-                  <div className="bp-iata">{result.dest_iata || result.dest_city?.substring(0,3).toUpperCase()}</div>
+                  <div className="bp-iata">
+                    {result.dest_iata || result.dest_city?.substring(0, 3).toUpperCase()}
+                  </div>
                   <div className="bp-city">{result.dest_city}</div>
                 </div>
               </div>
@@ -391,9 +522,14 @@ const Checkin = () => {
                 ))}
               </div>
 
-              <div className="bp-barcode">
-                {'|'.repeat(60).split('').map((_, i) => (
-                  <div key={i} className="bar" style={{ height: i % 5 === 0 ? 28 : 20, width: i % 3 === 0 ? 3 : 2 }} />
+              {/* Decorative barcode */}
+              <div className="bp-barcode" aria-hidden="true">
+                {Array.from({ length: 60 }, (_, i) => (
+                  <div
+                    key={i}
+                    className="bar"
+                    style={{ height: i % 5 === 0 ? 28 : 20, width: i % 3 === 0 ? 3 : 2 }}
+                  />
                 ))}
               </div>
             </div>

@@ -53,7 +53,7 @@ const DetailModal = ({ user, onClose }) => {
               { label: 'Số điện thoại',   value: user.phone_number    || '—' },
               { label: 'CCCD / Hộ chiếu', value: user.id_number       || '—' },
               { label: 'Trạng thái',       value: user.status === 'banned' ? 'Đã khóa' : 'Hoạt động' },
-              { label: 'Tổng đơn đặt vé', value: `${user.total_bookings ?? 0} đơn` },
+              { label: 'Tổng đơn đặt vé', value: `${user.booking_count ?? 0} đơn` },  // ✅ fix: total_bookings → booking_count
               { label: 'Tổng chi tiêu',    value: fmtMoney(user.total_spent ?? 0) },
               { label: 'Ngày tham gia',    value: user.created_at ? new Date(user.created_at).toLocaleDateString('vi-VN') : '—' },
             ].map(({ label, value }) => (
@@ -79,10 +79,10 @@ const AdminCustomers = () => {
   const [filter, setFilter] = useState('');
   const [detail, setDetail] = useState(null);
 
-  // Lọc bỏ tài khoản khách/guest
+  // Lọc bỏ tài khoản guest và chỉ giữ role USER/user (khách hàng thực)
   const realUsers = useMemo(() =>
     data.filter((x) =>
-      x.role !== 'guest' &&
+      x.role?.toLowerCase() === 'user' &&
       x.email !== 'guest@skybooker.vn' &&
       x.username !== 'Khách'
     ), [data]);
@@ -150,7 +150,8 @@ const AdminCustomers = () => {
                   ? <span className="type-tag"><i className="fas fa-id-card" style={{ marginRight: 5 }}/>{x.id_number}</span>
                   : <span className="text-gray">—</span>}
               </td>
-              <td><span className="badge badge-info">{x.total_bookings ?? 0} đơn</span></td>
+              {/* ✅ fix: total_bookings → booking_count */}
+              <td><span className="badge badge-info">{x.booking_count ?? 0} đơn</span></td>
               <td><strong className="text-blue">{fmtMoney(x.total_spent ?? 0)}</strong></td>
               <td><Badge status={isBanned ? 'banned' : 'active'} /></td>
               <td className="actions">

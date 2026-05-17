@@ -8,17 +8,17 @@ const removeVietnameseTones = (str) => {
 };
 
 const COUNTRY_OPTIONS = [
-  { value: 'Việt Nam',    label: '🇻🇳 Việt Nam'    }, { value: 'Singapore',   label: '🇸🇬 Singapore'   },
-  { value: 'Thái Lan',    label: '🇹🇭 Thái Lan'    }, { value: 'Malaysia',    label: '🇲🇾 Malaysia'    },
-  { value: 'Nhật Bản',    label: '🇯🇵 Nhật Bản'    }, { value: 'Hàn Quốc',    label: '🇰🇷 Hàn Quốc'    },
-  { value: 'Trung Quốc',  label: '🇨🇳 Trung Quốc'  }, { value: 'Hồng Kông',   label: '🇭🇰 Hồng Kông'   },
-  { value: 'Đài Loan',    label: '🇹🇼 Đài Loan'    }, { value: 'Indonesia',   label: '🇮🇩 Indonesia'   },
-  { value: 'Philippines', label: '🇵🇭 Philippines' }, { value: 'Ấn Độ',       label: '🇮🇳 Ấn Độ'       },
-  { value: 'Úc',          label: '🇦🇺 Úc'          }, { value: 'Anh',         label: '🇬🇧 Anh'         },
-  { value: 'Pháp',        label: '🇫🇷 Pháp'        }, { value: 'Đức',         label: '🇩🇪 Đức'         },
-  { value: 'Mỹ',          label: '🇺🇸 Mỹ'          }, { value: 'Canada',      label: '🇨🇦 Canada'      },
-  { value: 'UAE',         label: '🇦🇪 UAE'         }, { value: 'Qatar',       label: '🇶🇦 Qatar'       },
-  { value: 'Thổ Nhĩ Kỳ', label: '🇹🇷 Thổ Nhĩ Kỳ' },
+  { value: 'Việt Nam',    label: 'Việt Nam'    }, { value: 'Singapore',   label: 'Singapore'   },
+  { value: 'Thái Lan',    label: 'Thái Lan'    }, { value: 'Malaysia',    label: 'Malaysia'    },
+  { value: 'Nhật Bản',    label: 'Nhật Bản'    }, { value: 'Hàn Quốc',    label: 'Hàn Quốc'    },
+  { value: 'Trung Quốc',  label: 'Trung Quốc'  }, { value: 'Hồng Kông',   label: 'Hồng Kông'   },
+  { value: 'Đài Loan',    label: 'Đài Loan'    }, { value: 'Indonesia',   label: 'Indonesia'   },
+  { value: 'Philippines', label: 'Philippines' }, { value: 'Ấn Độ',       label: 'Ấn Độ'       },
+  { value: 'Úc',          label: 'Úc'          }, { value: 'Anh',         label: 'Anh'         },
+  { value: 'Pháp',        label: 'Pháp'        }, { value: 'Đức',         label: 'Đức'         },
+  { value: 'Mỹ',          label: 'Mỹ'          }, { value: 'Canada',      label: 'Canada'      },
+  { value: 'UAE',         label: 'UAE'         }, { value: 'Qatar',       label: 'Qatar'       },
+  { value: 'Thổ Nhĩ Kỳ', label: 'Thổ Nhĩ Kỳ' },
 ];
 
 const CITY_BY_COUNTRY = {
@@ -65,14 +65,14 @@ const AdminAirports = () => {
     {
       key: 'airport_id', label: 'Mã IATA (3 ký tự)', required: true,
       validate: (v) => {
-        if (!v || !v.trim()) return 'Mã IATA không được để trống';
-        if (!/^[A-Za-z]{3}$/.test(v.trim())) return 'Mã IATA phải gồm đúng 3 chữ cái (VD: HAN, SGN)';
+        if (!v || !String(v).trim()) return 'Mã IATA không được để trống';
+        if (!/^[A-Za-z]{3}$/.test(String(v).trim())) return 'Mã IATA phải gồm đúng 3 chữ cái (VD: HAN, SGN)';
         return null;
       },
     },
     {
       key: 'name', label: 'Tên sân bay', required: true,
-      validate: (v) => (!v || !v.trim()) ? 'Tên sân bay không được để trống' : null,
+      validate: (v) => (!v || !String(v).trim()) ? 'Tên sân bay không được để trống' : null,
     },
     {
       key: 'country', label: 'Quốc gia', type: 'combobox',
@@ -101,6 +101,21 @@ const AdminAirports = () => {
     );
   }, [data, query, filter]);
 
+  // 1. TẠO HÀM BỌC ĐỂ LỌC RÁC & GÁN GIÁ TRỊ MẶC ĐỊNH
+  const handleSaveWrapper = (formData) => {
+    const cleanPayload = {
+      // Ép uppercase luôn cho chuẩn mã IATA
+      airport_id: (formData.airport_id && typeof formData.airport_id === 'string') ? formData.airport_id.trim().toUpperCase() : '',
+      name: formData.name || '',
+      country: (formData.country === 'click' || !formData.country) ? 'Việt Nam' : formData.country,
+      city: (formData.city === 'click' || !formData.city) ? 'Hà Nội' : formData.city,
+      status: (formData.status === 'click' || !formData.status) ? 'active' : formData.status,
+    };
+
+    console.log(" Payload Sân Bay SẠCH:", cleanPayload);
+    handleSave(cleanPayload);
+  };
+
   return (
     <div className="panel-card">
       <div className="panel-header">
@@ -109,8 +124,14 @@ const AdminAirports = () => {
           <p className="panel-subtitle">{filtered.length} / {data.length} sân bay</p>
         </div>
       </div>
+      
       <SearchBar query={query} onQuery={setQuery} placeholder="Tìm mã IATA, tên, thành phố..."
-        filterVal={filter} filterOptions={FILTER_OPTS} onFilter={setFilter} onAdd={openAdd} addLabel="Thêm sân bay" />
+        filterVal={filter} filterOptions={FILTER_OPTS} onFilter={setFilter} 
+        // 2. NGĂN EVENT CHUỘT BẰNG ARROW FUNCTION + TRUYỀN DATA MẶC ĐỊNH CHO FORM MỚI
+        onAdd={() => openAdd({ airport_id: '', name: '', country: 'Việt Nam', city: 'Hà Nội', status: 'active' })} 
+        addLabel="Thêm sân bay" 
+      />
+
       <AdminTable loading={loading} headers={HEADERS}
         rows={filtered.map((x) => (
           <tr key={x.airport_id}>
@@ -123,11 +144,12 @@ const AdminAirports = () => {
           </tr>
         ))}
       />
+
       <AdminModal
         isOpen={modal.isOpen} item={modal.item} fields={FIELDS}
         title={modal.item ? 'Sửa sân bay' : 'Thêm sân bay mới'}
         onClose={closeModal}
-        onSave={(item) => handleSave({ ...item, airport_id: (item.airport_id || '').trim().toUpperCase() })}
+        onSave={handleSaveWrapper} 
         saving={saving} apiError={apiError}
       />
     </div>

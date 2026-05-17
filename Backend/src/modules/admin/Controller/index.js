@@ -1,7 +1,7 @@
 // ── Admin Controllers (barrel) ────────────────────────────────
 // Import từ đây thay vì import trực tiếp từng file
 
-const { getStats }                                          = require('./stats_controller');
+const { getStats, getMonthlyStats }                         = require('./stats_controller');
 const { getFlights, createFlight, updateFlight, deleteFlight } = require('./flight_controller');
 const { getAircrafts, createAircraft, updateAircraft, deleteAircraft } = require('./aircraft_controller');
 const { getAirports, createAirport, updateAirport, deleteAirport }     = require('./airport_controller');
@@ -11,7 +11,7 @@ const { getAirlines, createAirline, updateAirline, deleteAirline }     = require
 const { getCustomers, banCustomer, unbanCustomer }                     = require('./customer_controller');
 
 module.exports = {
-  getStats,
+  getStats, getMonthlyStats,
   getFlights, createFlight, updateFlight, deleteFlight,
   getAircrafts, createAircraft, updateAircraft, deleteAircraft,
   getAirports, createAirport, updateAirport, deleteAirport,

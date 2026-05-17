@@ -4,13 +4,27 @@ const { sql, getPool } = require('../../../config/db');
 const getAircrafts = async (req, res) => {
   try {
     const { q } = req.query;
-    const pool = await getPool();
+    const pool    = await getPool();
     const request = pool.request();
-    let where = '';
+
+    const isStaff   = req.user?.role === 'AIRLINE_ADMIN';
+    const airlineId = req.user?.airline_id;
+
+    const conditions = [];
+
+    // AIRLINE_ADMIN chỉ thấy máy bay của hãng mình
+    if (isStaff && airlineId) {
+      request.input('airline_id', sql.Int, airlineId);
+      conditions.push('ac.airline_id = @airline_id');
+    }
+
     if (q) {
       request.input('q', sql.NVarChar, `%${q}%`);
-      where = `WHERE ac.model_name LIKE @q OR al.airline_name LIKE @q`;
+      conditions.push('(ac.model_name LIKE @q OR al.airline_name LIKE @q)');
     }
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
     const result = await request.query(`
       SELECT ac.*, al.airline_name, al.airline_code, al.logo_url AS airline_logo
       FROM dbo.Aircrafts ac

@@ -14,18 +14,17 @@ const safeUser = (u) => ({
   id_number:    u.id_number,
   role:         u.role,
   status:       u.status,
+  airline_id:   u.airline_id ?? null,
   created_at:   u.created_at,
 });
 
 // ── Register ──────────────────────────────────────────────────
 const register = async (req, res) => {
   try {
-    const { username, phone_number, id_number, date_of_birth } = req.body;
-    console.log('REGISTER attempt:', { username, email });
+    const { username, email, password, phone_number, id_number } = req.body;
 
     const pool = await getPool();
 
-    // Check duplicate email
     const exists = await pool.request()
       .input('email', sql.NVarChar, email)
       .query('SELECT user_id FROM dbo.Users WHERE email = @email');
@@ -36,20 +35,25 @@ const register = async (req, res) => {
     const hash = await bcrypt.hash(password, 10);
 
     const result = await pool.request()
-      .input('username',     sql.NVarChar, username)
-      .input('password_hash',sql.NVarChar, hash)
-      .input('email',        sql.NVarChar, email)
-      .input('phone_number', sql.NVarChar, phone_number || null)
-      .input('id_number',    sql.NVarChar, id_number    || null)
+      .input('username',      sql.NVarChar, username)
+      .input('password_hash', sql.NVarChar, hash)
+      .input('email',         sql.NVarChar, email)
+      .input('phone_number',  sql.NVarChar, phone_number || null)
+      .input('id_number',     sql.NVarChar, id_number    || null)
       .query(`
         INSERT INTO dbo.Users (username, password_hash, email, phone_number, id_number)
         OUTPUT INSERTED.user_id, INSERTED.username, INSERTED.email,
-               INSERTED.phone_number, INSERTED.id_number, INSERTED.role, INSERTED.status, INSERTED.created_at
+               INSERTED.phone_number, INSERTED.id_number, INSERTED.role,
+               INSERTED.status, INSERTED.airline_id, INSERTED.created_at
         VALUES (@username, @password_hash, @email, @phone_number, @id_number)
       `);
 
     const user  = result.recordset[0];
-    const token = signToken({ user_id: user.user_id, role: user.role });
+    const token = signToken({
+      user_id:    user.user_id,
+      role:       user.role,
+      airline_id: user.airline_id ?? null,
+    });
 
     res.status(201).json({ success: true, token, user: safeUser(user) });
   } catch (err) {
@@ -79,7 +83,11 @@ const login = async (req, res) => {
     if (!match)
       return res.status(401).json({ success: false, message: 'Email hoặc mật khẩu không đúng' });
 
-    const token = signToken({ user_id: user.user_id, role: user.role });
+    const token = signToken({
+      user_id:    user.user_id,
+      role:       user.role,
+      airline_id: user.airline_id ?? null,
+    });
 
     res.json({ success: true, token, user: safeUser(user) });
   } catch (err) {
@@ -108,6 +116,10 @@ const getMe = async (req, res) => {
 };
 
 // ── Update profile ────────────────────────────────────────────
+// FIX: removed date_of_birth — column does not exist in dbo.Users.
+// To re-enable: ALTER TABLE dbo.Users ADD date_of_birth DATE NULL;
+// then add back: .input('dob', sql.Date, date_of_birth || null)
+// and in SET: date_of_birth = @dob,
 const updateProfile = async (req, res) => {
   try {
     const { username, phone_number, id_number } = req.body;
@@ -115,15 +127,14 @@ const updateProfile = async (req, res) => {
 
     await pool.request()
       .input('id',           sql.Int,      req.user.user_id)
-      .input('username',     sql.NVarChar, username)          // thêm dòng này
-      .input('phone_number', sql.NVarChar, phone_number || null)
-      .input('id_number',    sql.NVarChar, id_number    || null)
-      .input('dob',          sql.Date,     date_of_birth || null)
+      .input('username',     sql.NVarChar, username      || null)
+      .input('phone_number', sql.NVarChar, phone_number  || null)
+      .input('id_number',    sql.NVarChar, id_number     || null)
       .query(`
         UPDATE dbo.Users
-        SET username = @username, phone_number = @phone_number,
-            id_number = @id_number, date_of_birth = @dob,
-            updated_at = GETDATE()
+        SET username     = @username,
+            phone_number = @phone_number,
+            id_number    = @id_number
         WHERE user_id = @id
       `);
 
@@ -138,13 +149,19 @@ const updateProfile = async (req, res) => {
 const changePassword = async (req, res) => {
   try {
     const { current_password, new_password } = req.body;
+    if (!current_password || !new_password)
+      return res.status(400).json({ success: false, message: 'Thiếu thông tin mật khẩu' });
+
     const pool = await getPool();
 
     const result = await pool.request()
       .input('id', sql.Int, req.user.user_id)
       .query('SELECT password_hash FROM dbo.Users WHERE user_id = @id');
 
-    const user  = result.recordset[0];
+    const user = result.recordset[0];
+    if (!user)
+      return res.status(404).json({ success: false, message: 'Không tìm thấy người dùng' });
+
     const match = await bcrypt.compare(current_password, user.password_hash);
     if (!match)
       return res.status(400).json({ success: false, message: 'Mật khẩu hiện tại không đúng' });
@@ -153,7 +170,7 @@ const changePassword = async (req, res) => {
     await pool.request()
       .input('id',   sql.Int,      req.user.user_id)
       .input('hash', sql.NVarChar, hash)
-      .query('UPDATE dbo.Users SET password_hash = @hash, updated_at = GETDATE() WHERE user_id = @id');
+      .query('UPDATE dbo.Users SET password_hash = @hash WHERE user_id = @id');
 
     res.json({ success: true, message: 'Đổi mật khẩu thành công' });
   } catch (err) {

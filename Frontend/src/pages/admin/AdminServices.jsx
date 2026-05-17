@@ -10,13 +10,13 @@ const removeVietnameseTones = (str) => {
 const FIELDS = [
   {
     key: 'service_name', label: 'Tên dịch vụ', required: true,
-    validate: (v) => (!v || !v.trim()) ? 'Tên dịch vụ không được để trống' : null,
+    validate: (v) => (!v || !String(v).trim()) ? 'Tên dịch vụ không được để trống' : null,
   },
   {
     key: 'type', label: 'Loại', type: 'select',
     options: [
       { value: 'meal',      label: 'Bữa ăn'          },
-      { value: 'baggage',   label: 'Hành lý'          },
+      { value: 'baggage',   label: 'Hành lý'         },
       { value: 'oversized', label: 'Hành lý cồng kềnh'},
     ],
   },
@@ -46,8 +46,8 @@ const TABS = [
 const TAB_LABEL = { meal: 'bữa ăn', baggage: 'dịch vụ hành lý' };
 
 const TYPE_BADGE = {
-  meal:      { label: 'Bữa ăn',           bg: '#fff7ed', color: '#f97316' },
-  baggage:   { label: 'Hành lý',           bg: '#eff6ff', color: '#3b82f6' },
+  meal:      { label: 'Bữa ăn',          bg: '#fff7ed', color: '#f97316' },
+  baggage:   { label: 'Hành lý',          bg: '#eff6ff', color: '#3b82f6' },
   oversized: { label: 'Hành lý cồng kềnh', bg: '#f5f3ff', color: '#7c3aed' },
 };
 
@@ -68,6 +68,26 @@ const AdminServices = () => {
     );
   }, [data, query, activeTab]);
 
+  const handleSaveWrapper = (formData) => {
+    // 1. TẠO PAYLOAD SẠCH: Chỉ bóc tách các trường thật sự cần, vứt bỏ toàn bộ rác Event
+    const cleanPayload = {
+      service_name: formData.service_name || '',
+      description: formData.description || '',
+      // Đề phòng thuộc tính type bị dính chữ "click" từ Event, ép về "meal" nếu cần
+      type: (formData.type === 'click' || !formData.type) ? 'meal' : formData.type,
+      status: (formData.status === 'click' || !formData.status) ? 'Active' : formData.status,
+      price: Number(formData.price) || 0
+    };
+
+    // 2. Nếu là thao tác SỬA, gắn thêm ID vào để gửi lên backend
+    if (formData.service_id) {
+      cleanPayload.service_id = formData.service_id;
+    }
+
+    console.log("Payload SẠCH (Đã lọc rác):", cleanPayload);
+    handleSave(cleanPayload);
+  };
+
   return (
     <div className="panel-card">
       <div className="panel-header">
@@ -77,7 +97,6 @@ const AdminServices = () => {
         </div>
       </div>
 
-      {/* Tabs */}
       <div style={{ display: 'flex', gap: 10, padding: '0 24px 16px' }}>
         {TABS.map((tab) => {
           const count = data.filter(x => tab.types.includes(x.type)).length;
@@ -106,12 +125,13 @@ const AdminServices = () => {
             </button>
           );
         })}
-        <button className="btn-primary" style={{ marginLeft: 'auto' }} onClick={openAdd}>
+        {/* QUAN TRỌNG: Gọi qua arrow function để tránh truyền Event chuột vào state */}
+        <button className="btn-primary" style={{ marginLeft: 'auto' }} 
+          onClick={() => openAdd()}>
           <i className="fas fa-plus" /> Thêm dịch vụ
         </button>
       </div>
 
-      {/* Search */}
       <div style={{ padding: '0 24px 16px' }}>
         <div className="search-input-wrap">
           <i className="fas fa-search" />
@@ -154,7 +174,9 @@ const AdminServices = () => {
       <AdminModal
         isOpen={modal.isOpen} item={modal.item} fields={FIELDS}
         title={modal.item ? 'Sửa dịch vụ' : 'Thêm dịch vụ mới'}
-        onClose={closeModal} onSave={handleSave} saving={saving} apiError={apiError}
+        onClose={closeModal} 
+        onSave={handleSaveWrapper} 
+        saving={saving} apiError={apiError}
       />
     </div>
   );

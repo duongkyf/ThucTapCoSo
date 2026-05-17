@@ -2,11 +2,15 @@ const { Router } = require('express');
 const { authenticate, authorizeRoles } = require('../../middleware/auth');
 const ctrl = require('./Controller/index');
 
-const router  = Router();
-const isAdmin = [authenticate, authorizeRoles('admin')];
+const router = Router();
 
-// GET /api/admin/stats
-router.get('/stats', isAdmin, ctrl.getStats);
+// FIX: dùng đúng tên role — 'SUPER_ADMIN' và 'AIRLINE_ADMIN'
+// (trước đây là 'admin' → không khớp JWT → 403)
+const isAdmin = [authenticate, authorizeRoles('SUPER_ADMIN', 'AIRLINE_ADMIN')];
+
+// ── Stats ─────────────────────────────────────────────────────
+router.get('/stats',         isAdmin, ctrl.getStats);
+router.get('/stats/monthly', isAdmin, ctrl.getMonthlyStats); // FIX: thêm route còn thiếu
 
 // ── Flights ───────────────────────────────────────────────────
 router.get   ('/flights',     isAdmin, ctrl.getFlights);
@@ -34,9 +38,9 @@ router.delete('/services/:id', isAdmin, ctrl.deleteService);
 
 // ── Bookings ──────────────────────────────────────────────────
 router.get   ('/bookings',                    isAdmin, ctrl.getBookings);
-router.patch ('/bookings/:id/approve-cancel', isAdmin, ctrl.approveCancel); // duyệt yêu cầu hủy
-router.patch ('/bookings/:id/reject-cancel',  isAdmin, ctrl.rejectCancel);  // từ chối yêu cầu hủy
-router.delete('/bookings/:id',                isAdmin, ctrl.deleteBooking);  // soft delete
+router.patch ('/bookings/:id/approve-cancel', isAdmin, ctrl.approveCancel);
+router.patch ('/bookings/:id/reject-cancel',  isAdmin, ctrl.rejectCancel);
+router.delete('/bookings/:id',                isAdmin, ctrl.deleteBooking);
 
 // ── Airlines ──────────────────────────────────────────────────
 router.get   ('/airlines',     isAdmin, ctrl.getAirlines);

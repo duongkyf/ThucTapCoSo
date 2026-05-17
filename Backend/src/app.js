@@ -4,6 +4,8 @@ const cors    = require('cors');
 const helmet  = require('helmet');
 const morgan  = require('morgan');
 
+const { connectDB } = require('./config/db'); // ← thêm dòng này
+
 const app = express();
 
 // ── Global middleware ─────────────────────────────────────────
@@ -16,7 +18,6 @@ app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.use('/api/auth',     require('./modules/auth/auth.routes'));
 app.use('/api/flights',  require('./modules/flights/flights.routes'));
 
-// Checkin 
 const bookingCtrl = require('./modules/bookings/bookings.controller');
 app.post('/api/checkin', bookingCtrl.checkin);
 
@@ -35,6 +36,12 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ success: false, message: 'Lỗi server' });
 });
 
-// ── Start ─────────────────────────────────────────────────────
+// ── Start — kết nối DB trước, rồi mới listen ─────────────────
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(` Server running on http://localhost:${PORT}`));
+
+connectDB().then(() => {
+  app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+}).catch(err => {
+  console.error('Không thể khởi động server:', err);
+  process.exit(1);
+});

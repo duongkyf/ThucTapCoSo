@@ -1,41 +1,36 @@
 const sql = require('mssql');
-require('dotenv').config();
 
 const config = {
-  server:       process.env.DB_HOST     || 'localhost',
-  instanceName: process.env.DB_INSTANCE || undefined,
-  user:         process.env.DB_USER     || 'sa',
-  password:     process.env.DB_PASSWORD || '',
-  database:     process.env.DB_NAME     || 'skybooker',
+  server: 'localhost',
+  port: 1435,
+  database: 'skybooker_v2',
+  user: 'sa',
+  password: '123456',
   options: {
-    encrypt:                false,
-    trustedConnection:      false,
+    encrypt: false,
     trustServerCertificate: true,
-    enableArithAbort:       true,
-    useUTC: false,
   },
-  pool: {
-    max: 10,
-    min: 0,
-    idleTimeoutMillis: 30000,
-  },
+  connectionTimeout: 30000,
+  requestTimeout: 30000
 };
 
-// Singleton pool
-let pool;
+let pool = null;
 
-const getPool = async () => {
-  if (!pool) {
+const connectDB = async () => {
+  try {
     pool = await sql.connect(config);
-    console.log(' SQL Server connected:', process.env.DB_NAME);
+    console.log('✅ Kết nối SQL Server thành công');
+    return pool;
+  } catch (err) {
+    console.error('❌ Kết nối thất bại:', err.message);
+    process.exit(1);
   }
+};
+
+const getPool = () => {
+  if (!pool) throw new Error('Database chưa được kết nối!');
   return pool;
 };
 
-// Tự connect khi module được load
-getPool().catch((err) => {
-  console.error(' SQL Server connection failed:', err.message);
-  process.exit(1);
-});
-
-module.exports = { sql, getPool };
+module.exports = { connectDB, getPool, sql };
+//              

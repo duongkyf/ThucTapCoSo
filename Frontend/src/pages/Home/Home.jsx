@@ -30,6 +30,238 @@ const CLASS_TIERS = [
   { type: 'first',    name: 'Hạng nhất',           ratio: 4,   benefits: ['Hành lý 40kg', 'Phòng chờ VIP', 'Bữa ăn Chef', 'Ghế nằm hoàn toàn'] },
 ];
 
+const AI_SLIDER_CONFIG = [
+  { key: 'price',   label: 'Giá vé tốt',        icon: 'fas fa-tag',           color: '#2563a8', trackColor: '#2563a8' },
+  { key: 'seat',    label: 'Hạng ghế phù hợp',  icon: 'fas fa-chair',         color: '#e84393', trackColor: '#e84393' },
+  { key: 'time',    label: 'Giờ bay hợp lý',     icon: 'fas fa-clock',         color: '#16a34a', trackColor: '#16a34a' },
+  { key: 'airline', label: 'Hãng bay phù hợp',  icon: 'fas fa-plane-circle-check', color: '#c9973a', trackColor: '#c9973a' },
+];
+
+const DEFAULT_AI_PREFS = { price: 7, seat: 5, time: 4, airline: 2 };
+
+// ─── Donut Chart SVG ───────────────────────────────────────────
+const DonutChart = ({ prefs }) => {
+  const total = Object.values(prefs).reduce((a, b) => a + b, 0) || 1;
+  const colors = { price: '#2563a8', seat: '#e84393', time: '#16a34a', airline: '#c9973a' };
+  const order  = ['price', 'seat', 'time', 'airline'];
+  const R = 54, cx = 70, cy = 70, stroke = 22;
+  const circ = 2 * Math.PI * R;
+
+  let offset = 0;
+  const slices = order.map(key => {
+    const pct   = prefs[key] / total;
+    const dash  = pct * circ;
+    const gap   = circ - dash;
+    const slice = { key, dash, gap, offset, color: colors[key], pct: Math.round(pct * 100) };
+    offset += dash;
+    return slice;
+  });
+
+  // find dominant slice for center label
+  const dominant = order.reduce((a, b) => prefs[a] >= prefs[b] ? a : b);
+  const domPct   = Math.round((prefs[dominant] / total) * 100);
+
+  return (
+    <svg width={140} height={140} viewBox="0 0 140 140">
+      {/* bg ring */}
+      <circle cx={cx} cy={cy} r={R} fill="none" stroke="#e8f0fb" strokeWidth={stroke} />
+      {slices.map(s => (
+        <circle key={s.key} cx={cx} cy={cy} r={R} fill="none"
+          stroke={s.color} strokeWidth={stroke}
+          strokeDasharray={`${s.dash} ${s.gap}`}
+          strokeDashoffset={-s.offset + circ / 4}
+          style={{ transition: 'stroke-dasharray .4s ease' }}
+        />
+      ))}
+      {/* center label */}
+      <text x={cx} y={cy - 6} textAnchor="middle" fontSize="15" fontWeight="700" fill="#0b1e3d">{domPct}%</text>
+      <text x={cx} y={cy + 10} textAnchor="middle" fontSize="9" fill="#64748b">đóng góp</text>
+    </svg>
+  );
+};
+
+// ─── AI Preference Slider Panel ────────────────────────────────
+const AISliderPanel = ({ prefs, onChange, onClose, onApply }) => {
+  const overlayRef = useRef(null);
+  const total = Object.values(prefs).reduce((a, b) => a + b, 0) || 1;
+
+  useEffect(() => {
+    const handleKey = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [onClose]);
+
+  const handleOverlayClick = (e) => {
+    if (e.target === overlayRef.current) onClose();
+  };
+
+  const S = {
+    overlay: {
+      position: 'fixed', inset: 0,
+      background: 'rgba(11,30,61,0.55)', backdropFilter: 'blur(3px)',
+      zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    },
+    modal: {
+      background: '#fff', borderRadius: 20, width: 460, maxHeight: '90vh',
+      overflowY: 'auto', boxShadow: '0 24px 64px rgba(11,30,61,0.22)',
+      position: 'relative', fontFamily: "'DM Sans', sans-serif",
+    },
+    header: {
+      background: 'linear-gradient(135deg, #0b1e3d, #1a4080)',
+      borderRadius: '20px 20px 0 0', padding: '22px 28px',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    },
+    body: { padding: '24px 28px 28px' },
+    sectionLabel: {
+      fontSize: 10, fontWeight: 700, letterSpacing: '1.2px',
+      textTransform: 'uppercase', color: '#94a3b8', marginBottom: 14,
+    },
+  };
+
+  return (
+    <div ref={overlayRef} onClick={handleOverlayClick} style={S.overlay}>
+      <div style={S.modal}>
+
+        {/* ── Header ── */}
+        <div style={S.header}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 38, height: 38, borderRadius: 10,
+              background: 'rgba(201,151,58,0.25)', display: 'flex',
+              alignItems: 'center', justifyContent: 'center',
+            }}>
+              <i className="fas fa-sliders-h" style={{ color: '#c9973a', fontSize: 16 }} />
+            </div>
+            <div>
+              <div style={{ color: '#fff', fontWeight: 700, fontSize: 15 }}>Tùy chỉnh ưu tiên AI</div>
+              <div style={{ color: 'rgba(255,255,255,.55)', fontSize: 12, marginTop: 2 }}>
+                Điều chỉnh mức độ quan trọng của từng tiêu chí
+              </div>
+            </div>
+          </div>
+          <button onClick={onClose} style={{
+            background: 'rgba(255,255,255,.12)', border: 'none', borderRadius: 8,
+            width: 32, height: 32, cursor: 'pointer', color: 'rgba(255,255,255,.7)',
+            fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <i className="fas fa-times" />
+          </button>
+        </div>
+
+        <div style={S.body}>
+
+          {/* ── Donut + legend ── */}
+          <div style={S.sectionLabel}>Tỷ trọng đóng góp vào gợi ý</div>
+          <div style={{
+            background: '#f8faff', border: '1px solid #e8f0fb',
+            borderRadius: 14, padding: '18px 20px',
+            display: 'flex', alignItems: 'center', gap: 20, marginBottom: 24,
+          }}>
+            <DonutChart prefs={prefs} />
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {AI_SLIDER_CONFIG.map(({ key, label, color }) => {
+                const pct = Math.round((prefs[key] / total) * 100);
+                return (
+                  <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                      <span style={{ width: 10, height: 10, borderRadius: 3, background: color, flexShrink: 0, display: 'inline-block' }} />
+                      <span style={{ fontSize: 13, color: '#334155' }}>{label}</span>
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 700, color, minWidth: 36, textAlign: 'right' }}>{pct}%</span>
+                  </div>
+                );
+              })}
+              <div style={{ borderTop: '1px solid #e2e8f0', marginTop: 2, paddingTop: 6, fontSize: 12, color: '#94a3b8' }}>
+                Tổng: 100%
+              </div>
+            </div>
+          </div>
+
+          {/* ── Sliders ── */}
+          <div style={S.sectionLabel}>Điểm số từng tiêu chí</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {AI_SLIDER_CONFIG.map(({ key, label, icon, color }) => (
+              <div key={key} style={{
+                background: '#fafbff', border: '1px solid #e8f0fb',
+                borderRadius: 12, padding: '14px 16px',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{
+                      width: 28, height: 28, borderRadius: 7,
+                      background: `${color}18`, display: 'flex',
+                      alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    }}>
+                      <i className={icon} style={{ fontSize: 12, color }} />
+                    </div>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#1e293b' }}>{label}</span>
+                  </div>
+                  <span style={{
+                    background: color, color: '#fff', fontWeight: 700,
+                    fontSize: 13, borderRadius: 7, padding: '3px 10px',
+                    minWidth: 32, textAlign: 'center', boxShadow: `0 2px 8px ${color}44`,
+                  }}>
+                    {prefs[key]}
+                  </span>
+                </div>
+                {/* Custom range track */}
+                <div style={{ position: 'relative', height: 6, marginBottom: 4 }}>
+                  <div style={{
+                    position: 'absolute', left: 0, right: 0, top: 0, height: 6,
+                    background: '#e2e8f0', borderRadius: 99,
+                  }} />
+                  <div style={{
+                    position: 'absolute', left: 0, top: 0, height: 6,
+                    width: `${((prefs[key] - 1) / 9) * 100}%`,
+                    background: `linear-gradient(90deg, ${color}99, ${color})`,
+                    borderRadius: 99, transition: 'width .2s ease',
+                  }} />
+                  <input
+                    type="range" min={1} max={10} value={prefs[key]}
+                    onChange={e => onChange(key, Number(e.target.value))}
+                    style={{
+                      position: 'absolute', inset: 0, width: '100%', height: '100%',
+                      opacity: 0, cursor: 'pointer', margin: 0,
+                    }}
+                  />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#cbd5e1' }}>
+                  <span>Ít quan trọng</span><span>Rất quan trọng</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* ── Actions ── */}
+          <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
+            <button onClick={() => onChange('__reset__')} style={{
+              flex: 1, padding: '11px 0', borderRadius: 10,
+              border: '1.5px solid #e2e8f0', background: '#f8fafc',
+              color: '#64748b', fontWeight: 600, cursor: 'pointer', fontSize: 14,
+              fontFamily: "'DM Sans', sans-serif", transition: 'all .2s',
+            }}
+              onMouseEnter={e => { e.target.style.borderColor = '#1a4080'; e.target.style.color = '#1a4080'; }}
+              onMouseLeave={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.color = '#64748b'; }}
+            >
+              <i className="fas fa-rotate-left" style={{ marginRight: 6 }} />Đặt lại
+            </button>
+            <button onClick={onApply} style={{
+              flex: 2, padding: '11px 0', borderRadius: 10, border: 'none',
+              background: 'linear-gradient(135deg, #0b1e3d, #1a4080)',
+              color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 14,
+              fontFamily: "'DM Sans', sans-serif",
+              boxShadow: '0 4px 14px rgba(11,30,61,0.3)',
+            }}>
+              <i className="fas fa-check" style={{ marginRight: 6 }} />Áp dụng
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── mapFlight ─────────────────────────────────────────────────
 const mapFlight = (f) => ({
   id:          f.flight_id,
   flightCode:  f.flight_code,
@@ -42,7 +274,10 @@ const mapFlight = (f) => ({
   toCity:      f.dest_city,
   time:        new Date(f.departure_time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
   arrTime:     new Date(f.arrival_time).toLocaleTimeString('vi-VN',   { hour: '2-digit', minute: '2-digit' }),
-  duration:    `${Math.floor(f.duration_minutes / 60)}h ${f.duration_minutes % 60}m`,
+  duration: (() => {
+    const dur = Math.abs(f.duration_minutes || 0);
+    return `${Math.floor(dur / 60)}h ${dur % 60}m`;
+  })(),
   type:        'Bay thẳng',
   available_seats: f.available_seats,
   aircraft:    f.aircraft_model,
@@ -65,6 +300,7 @@ const fallbackAirports = [
   { code: 'CDG', name: 'Paris (CDG)' },
 ];
 
+// ─── Home ──────────────────────────────────────────────────────
 const Home = ({ user, onOpenAuth }) => {
   const [airports,     setAirports]     = useState([]);
   const [step,         setStep]         = useState(0);
@@ -89,6 +325,33 @@ const Home = ({ user, onOpenAuth }) => {
   const [bookingResult, setBookingResult] = useState(null);
 
   const [searchInitial, setSearchInitial] = useState(null);
+
+  // ── AI Slider state ──
+  const [showSlider,  setShowSlider]  = useState(false);
+  const [aiPrefs,     setAiPrefs]     = useState(DEFAULT_AI_PREFS);
+  const [pendingPrefs, setPendingPrefs] = useState(DEFAULT_AI_PREFS);
+
+  const handleOpenSlider  = useCallback(() => { setPendingPrefs(aiPrefs); setShowSlider(true); }, [aiPrefs]);
+  const handleCloseSlider = useCallback(() => setShowSlider(false), []);
+
+  const handlePrefChange = useCallback((key, value) => {
+    if (key === '__reset__') { setPendingPrefs(DEFAULT_AI_PREFS); return; }
+    setPendingPrefs(prev => ({ ...prev, [key]: value }));
+  }, []);
+
+  const handleApplyPrefs = useCallback(() => {
+    setAiPrefs(pendingPrefs);
+    setShowSlider(false);
+    // Nếu đang có kết quả tìm kiếm tái sắp xếp theo ưu tiên mới
+    setFlights(prev => [...prev].sort((a, b) => {
+      const score = (f) =>
+        (pendingPrefs.price   / 10) * (1 / (f.classes?.[0]?.price || 1)) * 1e7 +
+        (pendingPrefs.time    / 10) * (1 / (parseInt(f.duration) || 1)) * 100 +
+        (pendingPrefs.seat    / 10) * (f.available_seats || 0) * 0.1 +
+        (pendingPrefs.airline / 10) * 1;
+      return score(b) - score(a);
+    }));
+  }, [pendingPrefs]);
 
   useEffect(() => {
     flightService.getAirports()
@@ -126,7 +389,6 @@ const Home = ({ user, onOpenAuth }) => {
           aiEnabled,
           aiMeta: meta,
         }))
-        .sort((a, b) => (a.ai_rank ?? Infinity) - (b.ai_rank ?? Infinity));
       setFlights(mapped);
     } catch {
       setSearchError('Không thể tải dữ liệu chuyến bay. Vui lòng thử lại.');
@@ -218,42 +480,42 @@ const Home = ({ user, onOpenAuth }) => {
     const departDate = tomorrow.toISOString().split('T')[0];
     const pax = { adult: 1, child: 0, infant: 0 };
 
-    setSearchInitial({ toLoc: dest.airportCode, departDate, tripType: 'oneway' });
+    // Truyền fromLoc là chuỗi rỗng để kích hoạt UI "Tất cả chuyến bay đến..."
+    setSearchInitial({ fromLoc: '', toLoc: dest.airportCode, departDate, tripType: 'oneway' });
     setSearching(true); setSearchError(''); setHasSearched(true);
-    setSearchParams({ fromLoc: null, toLoc: dest.airportCode, toCity: dest.city, departDate, pax });
+    setSearchParams({ fromLoc: '', toLoc: dest.airportCode, toCity: dest.city, departDate, pax });
     setTripType('oneway'); setReturnDate('');
     setShowReturnSection(false); setActiveFlightTab('outbound');
     setSelectedFlight(null); setSelectedReturnFlight(null); setReturnFlights([]);
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
     try {
-      const res = await flightService.searchWithAI({
-        from:       null,
-        to:         dest.airportCode,
-        date:       departDate,
-        passengers: 1,
-        userId:     user?.user_id ?? null,
+      // SỬ DỤNG SEARCH BÌNH THƯỜNG THAY VÌ SEARCH AI
+      const res = await flightService.search({
+        from: '', // Gửi chuỗi rỗng để backend biết là tìm tất cả
+        to: dest.airportCode,
+        date: departDate,
       });
-      const rawFlights = res.data?.data      || [];
-      const aiEnabled  = res.data?.aiEnabled ?? false;
-      const meta       = res.data?.meta      ?? {};
-      const mapped = rawFlights
-        .map(f => ({
-          ...mapFlight(f),
-          pax,
-          ai_rank:     f.ai_rank     ?? null,
-          ai_score:    f.ai_score    ?? 0,
-          explanation: f.explanation ?? null,
-          aiEnabled,
-          aiMeta: meta,
-        }))
-        .sort((a, b) => (a.ai_rank ?? Infinity) - (b.ai_rank ?? Infinity));
+      
+      const rawFlights = res.data?.data || [];
+      
+      const mapped = rawFlights.map(f => ({
+        ...mapFlight(f),
+        pax,
+        // Ép các thông số AI về mặc định vì search thường không có AI
+        ai_rank: null,
+        ai_score: 0,
+        explanation: null,
+        aiEnabled: false, 
+        aiMeta: {},
+      }));
+      
       setFlights(mapped);
     } catch {
       setSearchError('Không thể tải dữ liệu chuyến bay. Vui lòng thử lại.');
       setFlights([]);
     } finally { setSearching(false); }
-  }, [user]);
+  }, []);
 
   const handleCustomizeSearch = useCallback(() => {
     setHasSearched(false);
@@ -263,8 +525,24 @@ const Home = ({ user, onOpenAuth }) => {
 
   return (
     <div className="home-page">
+
+      {/* ── AI Preference Slider Panel ── */}
+      {showSlider && (
+        <AISliderPanel
+          prefs={pendingPrefs}
+          onChange={handlePrefChange}
+          onClose={handleCloseSlider}
+          onApply={handleApplyPrefs}
+        />
+      )}
+
       {step === 0 && (<>
-        <FlightSearch airports={airports} onSearch={handleSearch} initialValues={searchInitial} />
+        <FlightSearch
+          airports={airports}
+          onSearch={handleSearch}
+          initialValues={searchInitial}
+          onOpenSlider={handleOpenSlider}
+        />
 
         {hasSearched && (
           <div className="results-section">
@@ -309,6 +587,25 @@ const Home = ({ user, onOpenAuth }) => {
                     }
                     <span> — {flights.length} kết quả</span>
                   </h2>
+                  {/* ── Badge: đang dùng ưu tiên tùy chỉnh ── */}
+                  {JSON.stringify(aiPrefs) !== JSON.stringify(DEFAULT_AI_PREFS) && (
+                    <div style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 8,
+                      background: '#ede9fe', border: '1px solid #c4b5fd',
+                      borderRadius: 10, padding: '6px 14px',
+                      fontSize: 13, color: '#5b21b6', fontWeight: 500,
+                      marginBottom: 16,
+                    }}>
+                      <i className="fas fa-sliders-h" />
+                      Đang sắp xếp theo sở thích tùy chỉnh của bạn
+                      <button
+                        onClick={() => { setAiPrefs(DEFAULT_AI_PREFS); setPendingPrefs(DEFAULT_AI_PREFS); }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#7c3aed', fontSize: 12, padding: '0 0 0 4px', fontWeight: 600 }}
+                      >
+                        Đặt lại
+                      </button>
+                    </div>
+                  )}
                   {flights.map(f => (
                     <FlightCard key={f.id} flight={f} onSelect={handleSelectFlight} selected={selectedFlight?.id === f.id} />
                   ))}

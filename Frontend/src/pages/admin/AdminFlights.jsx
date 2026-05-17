@@ -1,6 +1,7 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAdminCrud, Badge, AdminTable, ActionBtns, AdminModal } from './AdminShared';
 import { adminService } from '../../services/admin.service';
+import { useAuth } from '../../hooks/useAuth';
 
 const removeVietnameseTones = (str) => {
   if (!str) return '';
@@ -27,174 +28,9 @@ const AIRLINE_COLORS = {
 
 const HEADERS = ['MÃ CHUYẾN', 'HÃNG BAY', 'TUYẾN BAY', 'KHỞI HÀNH', 'ĐẾN', 'GIÁ VÉ', 'LOẠI', 'TRẠNG THÁI', 'HÀNH ĐỘNG'];
 
-// ─── FlightChart ──────────────────────────────────────────────
-const FlightChart = ({ data }) => {
-  const canvasRef = useRef(null);
-  const chartRef  = useRef(null);
-
-  const chartData = useMemo(() => {
-    const toKey = (d) =>
-      `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-
-    const today       = new Date();
-    const windowStart = new Date(today); windowStart.setDate(today.getDate() - 14);
-    const windowEnd   = new Date(today); windowEnd.setDate(today.getDate() + 15);
-    windowStart.setHours(0,0,0,0);
-    windowEnd.setHours(23,59,59,999);
-
-    const counts = {};
-    for (let d = new Date(windowStart); d <= windowEnd; d.setDate(d.getDate() + 1)) {
-      counts[toKey(new Date(d))] = 0;
-    }
-
-    data.forEach(x => {
-      if (!x.departure_time) return;
-      const dep = new Date(x.departure_time);
-      if (x.is_recurring) {
-        const start = dep > windowStart ? dep : windowStart;
-        for (let d = new Date(start); d <= windowEnd; d.setDate(d.getDate() + 1)) {
-          const key = toKey(new Date(d));
-          if (key in counts) counts[key]++;
-        }
-      } else {
-        const key = toKey(dep);
-        if (key in counts) counts[key]++;
-      }
-    });
-
-    const sorted   = Object.keys(counts).sort();
-    const todayKey = toKey(today);
-    const labels   = sorted.map(k => {
-      const [, m, d] = k.split('-');
-      return k === todayKey ? `${d}/${m} ▪` : `${d}/${m}`;
-    });
-    const values = sorted.map(k => counts[k]);
-    return { labels, values, todayIndex: sorted.indexOf(todayKey) };
-  }, [data]);
-
-  const stats = useMemo(() => {
-    const v = chartData.values;
-    if (!v.length) return { windowTotal: 0, recurring: 0, avg: 0, max: 0 };
-    return {
-      windowTotal: v.reduce((s, x) => s + x, 0),
-      recurring:   data.filter(x => x.is_recurring).length,
-      avg:         Math.round(v.reduce((s, x) => s + x, 0) / v.length),
-      max:         Math.max(...v),
-    };
-  }, [chartData, data]);
-
-  // Vẽ chart khi chartData thay đổi
-  useEffect(() => {
-    if (!canvasRef.current || typeof window.Chart === 'undefined') return;
-    if (chartRef.current) chartRef.current.destroy();
-
-    const isDark      = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const lineColor   = isDark ? '#60a5fa' : '#3b82f6';
-    const todayColor  = '#f59e0b';
-
-    chartRef.current = new window.Chart(canvasRef.current, {
-      type: 'bar',
-      data: {
-        labels: chartData.labels,
-        datasets: [{
-          label: 'Số chuyến bay',
-          data: chartData.values,
-          backgroundColor: chartData.labels.map((_, i) =>
-            i === chartData.todayIndex ? todayColor + 'cc' : lineColor + '99'
-          ),
-          borderColor: chartData.labels.map((_, i) =>
-            i === chartData.todayIndex ? todayColor : lineColor
-          ),
-          borderWidth: 1.5, borderRadius: 5, borderSkipped: false,
-        }],
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              title: (items) => `Ngày ${items[0].label}`,
-              label: (item)  => `  ${item.raw} chuyến bay`,
-            },
-            backgroundColor: isDark ? '#1e293b' : '#fff',
-            titleColor:      isDark ? '#f1f5f9' : '#1e293b',
-            bodyColor:       isDark ? '#94a3b8' : '#475569',
-            borderColor:     isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
-            borderWidth: 1, padding: 10, cornerRadius: 8,
-          },
-        },
-        scales: {
-          x: {
-            ticks: { color: isDark ? '#94a3b8' : '#64748b', font: { size: 11 }, maxRotation: 45, autoSkip: chartData.labels.length > 15 },
-            grid: { display: false }, border: { display: false },
-          },
-          y: {
-            beginAtZero: true,
-            ticks: { color: isDark ? '#94a3b8' : '#64748b', font: { size: 11 }, stepSize: 1, precision: 0 },
-            grid: { color: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' },
-            border: { display: false },
-          },
-        },
-      },
-    });
-
-    return () => { if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; } };
-  }, [chartData]);
-
-  // Load Chart.js một lần
-  useEffect(() => {
-    if (window.Chart) return;
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js';
-    script.onload = () => {
-      if (canvasRef.current) canvasRef.current.dispatchEvent(new Event('chartjs-ready'));
-    };
-    document.head.appendChild(script);
-  }, []);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const handler = () => { if (chartRef.current) chartRef.current.destroy(); };
-    canvas.addEventListener('chartjs-ready', handler);
-    return () => canvas.removeEventListener('chartjs-ready', handler);
-  }, [chartData]);
-
-  return (
-    <div className="panel-card" style={{ marginBottom: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <div>
-          <h3 style={{ margin: 0, padding: 10, fontSize: 15, fontWeight: 700, color: '#1e293b' }}>
-            Số chuyến bay theo ngày
-          </h3>
-          <p style={{ margin: '2px 0 0', fontSize: 12, color: '#94a3b8' }}>
-            {chartData.labels.length} ngày gần nhất
-          </p>
-        </div>
-        {/* Mini stats */}
-        <div style={{ display: 'flex', gap: 20, paddingRight: 16 }}>
-          {[
-            { label: 'Trong cửa sổ', value: stats.windowTotal, color: '#3b82f6' },
-            { label: 'Bay hàng ngày', value: stats.recurring,   color: '#f59e0b' },
-            { label: 'Trung bình/ngày', value: stats.avg,       color: '#10b981' },
-          ].map(s => (
-            <div key={s.label} style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 20, fontWeight: 800, color: s.color }}>{s.value}</div>
-              <div style={{ fontSize: 11, color: '#94a3b8' }}>{s.label}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div style={{ height: 180 }}>
-        <canvas ref={canvasRef} />
-      </div>
-    </div>
-  );
-};
-
-// ─── Main component ───────────────────────────────────────────
 const AdminFlights = () => {
+  const { isAirlineAdmin, airlineId } = useAuth();
+
   const [airlines,  setAirlines]  = useState([]);
   const [aircrafts, setAircrafts] = useState([]);
   const [airports,  setAirports]  = useState([]);
@@ -217,16 +53,18 @@ const AdminFlights = () => {
   }));
 
   const FIELDS = useMemo(() => [
-    {
+    { key: 'flight_code', label: 'Mã chuyến bay', type: 'text' },
+    ...(!isAirlineAdmin ? [{
       key: 'airline_id', label: 'Hãng hàng không', type: 'combobox',
       placeholder: 'Nhập hoặc chọn hãng bay...',
       options: airlines.map(a => ({ value: a.airline_id, label: a.airline_name })),
-    },
+    }] : []),
     {
       key: 'aircraft_id', label: 'Máy bay', type: 'select',
       dependsOn: 'airline_id',
       options: (selectedAirlineId) => {
-        const byAirline = aircrafts.filter(a => String(a.airline_id) === String(selectedAirlineId));
+        const filterBy = isAirlineAdmin ? airlineId : selectedAirlineId;
+        const byAirline = aircrafts.filter(a => String(a.airline_id) === String(filterBy));
         if (!byAirline.length) return [{ value: '', label: '— Không có máy bay —' }];
         return byAirline.map(a => ({
           value: a.aircraft_id,
@@ -258,11 +96,16 @@ const AdminFlights = () => {
         { value: 1, label: 'Hàng ngày (recurring)' },
       ],
     },
-  ], [airlines, aircrafts, airportOptions]);
+  ], [airlines, aircrafts, airportOptions, isAirlineAdmin, airlineId]);
 
   const { data, loading, modal, saving, apiError,
           openAdd, openEdit, closeModal, handleSave, handleDelete } =
     useAdminCrud(adminService.flights, adminService.flights.getAll, 'flight_id');
+
+  // Khi AIRLINE_ADMIN thêm mới → pre-fill airline_id của hãng mình
+  const handleOpenAdd = () => {
+    openAdd(isAirlineAdmin && airlineId ? { airline_id: airlineId } : undefined);
+  };
 
   const [query,         setQuery]         = useState('');
   const [filterStatus,  setFilterStatus]  = useState('');
@@ -291,10 +134,6 @@ const AdminFlights = () => {
 
   return (
     <div>
-      {/* Biểu đồ thống kê (toàn bộ data, không lọc) */}
-      <FlightChart data={data} />
-
-      {/* Bảng danh sách */}
       <div className="panel-card">
         <div className="panel-header">
           <div>
@@ -315,14 +154,17 @@ const AdminFlights = () => {
                 </button>
               )}
             </div>
-            <select className="filter-select" value={filterAirline} onChange={e => setFilterAirline(e.target.value)}>
-              {filterAirlineOpts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
+            {/* AIRLINE_ADMIN không cần filter hãng */}
+            {!isAirlineAdmin && (
+              <select className="filter-select" value={filterAirline} onChange={e => setFilterAirline(e.target.value)}>
+                {filterAirlineOpts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            )}
             <select className="filter-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
               {FILTER_STATUS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
-          <button className="btn-primary" onClick={openAdd}>
+          <button className="btn-primary" onClick={handleOpenAdd}>
             <i className="fas fa-plus" /> Thêm chuyến bay
           </button>
         </div>

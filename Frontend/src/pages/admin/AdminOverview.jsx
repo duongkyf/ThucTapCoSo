@@ -32,8 +32,8 @@ const buildEmptyMonths = (year) =>
     revenue: 0,
   }));
 
-// ─── FIX: Chuẩn hoá mảng daily từ nhiều format API khác nhau ──
-// API có thể trả về: [{date, revenue}], [{date, total}], [{day, revenue}], ...
+// ─── Chuẩn hoá mảng daily từ nhiều format API khác nhau ──
+
 const normalizeDaily = (raw) => {
   if (!Array.isArray(raw) || raw.length === 0) return null;
   return raw.map((item) => {
@@ -48,7 +48,6 @@ const RevenueChart = ({ data, barColor }) => {
   const hasData = data.some(d => d.revenue > 0);
   const max     = Math.max(...data.map(d => d.revenue), 1);
 
-  // FIX: Nếu toàn bộ data = 0 → hiển thị thông báo thay vì bar vô hình
   if (!hasData) {
     return (
       <div style={{
@@ -65,11 +64,9 @@ const RevenueChart = ({ data, barColor }) => {
     <div className="css-bar-chart">
       {data.map((item, i) => {
         const isToday = i === data.length - 1;
-        // FIX: Bar luôn cao tối thiểu 6% để thấy rõ, kể cả khi = 0
         const heightPct = item.revenue > 0
           ? Math.max((item.revenue / max) * 100, 6)
           : 6;
-
         return (
           <div className="css-bar-wrap" key={item.date}
             title={`${item.date}: ${Number(item.revenue).toLocaleString('vi-VN')} ₫`}>
@@ -77,7 +74,6 @@ const RevenueChart = ({ data, barColor }) => {
             <div className="css-bar" style={{
               height:     `${heightPct}%`,
               background: isToday ? (barColor || '#3b82f6') : undefined,
-              // FIX: opacity tối thiểu 0.5 thay vì 0.3 → bar vẫn nhìn thấy
               opacity:    item.revenue === 0 ? 0.5 : 1,
             }} />
             <span className="css-bar-label" style={{
@@ -124,7 +120,6 @@ const MonthlyRevenueChart = ({ data, year, onYearChange, barColor }) => {
         </div>
       </div>
 
-      {/* FIX: Nếu không có data → empty state thay vì bar cao 1% vô hình */}
       {!hasData ? (
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -138,7 +133,6 @@ const MonthlyRevenueChart = ({ data, year, onYearChange, barColor }) => {
           {data.map((item) => {
             const monthNum    = parseInt(item.month.split('-')[1], 10);
             const isThisMonth = year === currentYear && monthNum === currentMonth;
-            // FIX: tối thiểu 6% để bar luôn visible
             const pct = item.revenue > 0
               ? Math.max((item.revenue / max) * 100, 6)
               : 6;
@@ -151,7 +145,6 @@ const MonthlyRevenueChart = ({ data, year, onYearChange, barColor }) => {
                 <div className="css-bar monthly-bar" style={{
                   height:     `${pct}%`,
                   background: isThisMonth ? activeColor : '#10b981',
-                  // FIX: opacity tối thiểu 0.5
                   opacity:   item.revenue === 0 ? 0.5 : 1,
                 }} />
                 <span className="css-bar-label" style={{
@@ -387,7 +380,6 @@ const AdminOverview = ({ onNavigate }) => {
     adminService.getStats()
       .then(res => {
         const raw = res.data?.data;
-        // FIX: Chuẩn hoá daily revenue nếu API trả về format khác nhau
         if (raw?.revenue?.daily) {
           const normalizedDaily = normalizeDaily(raw.revenue.daily);
           if (normalizedDaily) raw.revenue.daily = normalizedDaily;
@@ -436,7 +428,6 @@ const AdminOverview = ({ onNavigate }) => {
     </div>
   );
 
-  // FIX: Hiển thị lỗi rõ ràng thay vì render dashboard trống
   if (statsError) return (
     <div style={{ textAlign: 'center', padding: '80px', color: '#ef4444' }}>
       <i className="fas fa-exclamation-triangle" style={{ fontSize: 32 }} />

@@ -15,9 +15,9 @@ export function useFetch(fetchFn) {
     } catch (err) {
       setError(err.response?.data?.message || 'Lỗi tải dữ liệu');
     } finally { setLoading(false); }
-  }, []); // eslint-disable-line
+  }, []); 
 
-  useEffect(() => { load(); }, []); // eslint-disable-line
+  useEffect(() => { load(); }, []);
 
   return { data, setData, loading, error, reload: load };
 }
@@ -29,14 +29,15 @@ export function useAdminCrud(service, fetchFn, idKey = 'id') {
   const [saving,   setSaving]   = useState(false);
   const [apiError, setApiError] = useState('');
 
-  const openAdd    = useCallback(() => setModal({ isOpen: true, item: null }), []);
+  // Nhận initialData để pre-fill form (dùng cho AIRLINE_ADMIN)
+  const openAdd    = useCallback((initialData = null) => setModal({ isOpen: true, item: initialData }), []);
   const openEdit   = useCallback((item) => setModal({ isOpen: true, item }), []);
   const closeModal = useCallback(() => { setModal({ isOpen: false, item: null }); setApiError(''); }, []);
 
   const handleSave = useCallback(async (formData) => {
     setSaving(true); setApiError('');
     try {
-      if (modal.item) {
+      if (modal.item?.[idKey]) {
         await service.update(modal.item[idKey], formData);
       } else {
         await service.create(formData);
@@ -59,7 +60,6 @@ export function useAdminCrud(service, fetchFn, idKey = 'id') {
 
 // ─── STATUS_CLASS ─────────────────────────────────────────────
 export const STATUS_CLASS = {
-  // Green
   'On Time':         'badge-success',
   'Active':          'badge-success',
   'active':          'badge-success',
@@ -70,15 +70,12 @@ export const STATUS_CLASS = {
   'Đã xác nhận':     'badge-success',
   'Đã check-in':     'badge-success',
   'Đang hoạt động':  'badge-success',
-  // Yellow
   'Delayed':         'badge-warning',
   'Pending':         'badge-warning',
   'Maintenance':     'badge-warning',
   'Chờ xử lý':      'badge-warning',
   'Bảo trì':         'badge-warning',
-  // Orange
   'Chờ hủy':         'badge-orange',
-  // Red
   'Cancelled':       'badge-danger',
   'Inactive':        'badge-danger',
   'inactive':        'badge-danger',
@@ -89,7 +86,6 @@ export const STATUS_CLASS = {
   'Ngừng hoạt động': 'badge-danger',
 };
 
-// Label map: DB value → display text
 export const STATUS_LABEL = {
   'Active':      'Đang hoạt động',
   'Maintenance': 'Bảo trì',
@@ -98,7 +94,7 @@ export const STATUS_LABEL = {
 
 // ─── helpers ──────────────────────────────────────────────────
 const firstOptionValue = (options = []) => {
-  if (!options.length) return '';
+  if (!Array.isArray(options) || !options.length) return '';
   const first = options[0];
   return typeof first === 'object' ? first.value : first;
 };
@@ -131,7 +127,6 @@ export const ComboBox = ({ options = [], value, onChange, placeholder = 'Nhập 
   const inputRef = useRef(null);
   const listRef  = useRef(null);
 
-  // Sync display label khi value hoặc options thay đổi
   useEffect(() => {
     const match = options.find((o) => String(o.value) === String(value));
     setInput(match ? match.label : value ?? '');
@@ -142,7 +137,6 @@ export const ComboBox = ({ options = [], value, onChange, placeholder = 'Nhập 
     setOpen(true);
   };
 
-  // Đóng khi click ra ngoài
   useEffect(() => {
     if (!open) return;
     const handler = (e) => {
@@ -174,7 +168,6 @@ export const ComboBox = ({ options = [], value, onChange, placeholder = 'Nhập 
     if (!open) openDropdown();
   };
 
-  // Portal dropdown — thoát overflow của modal
   const dropdown = open && rect && createPortal(
     <div
       ref={listRef}
@@ -327,25 +320,33 @@ export const AdminModal = ({ isOpen, item, fields, onClose, onSave, saving, apiE
 
   useEffect(() => {
     if (!isOpen) return;
-    const init = {};
-    fields.forEach(({ key, type, options }) => {
+
+    // FIX 1: copy TẤT CẢ key từ item vào init trước (kể cả field ẩn như airline_id)
+    const init = item ? { ...item } : {};
+
+    fields.forEach(({ key, type, options, dependsOn }) => {
       if (item?.[key] !== undefined && item?.[key] !== null) {
+        // Giữ nguyên giá trị từ item (edit hoặc pre-fill)
         init[key] = item[key];
       } else if (type === 'datetime-split') {
-        init[key] = item?.[key] ? item[key] : '';
-      } else if (type === 'select' && options?.length > 0) {
-        init[key] = firstOptionValue(options);
+        init[key] = '';
+      } else if (type === 'select') {
+        // FIX 2: khi options là function, gọi với init[dependsOn] đã có sẵn
+        const resolvedOpts = typeof options === 'function'
+          ? options(init[dependsOn])
+          : options;
+        init[key] = firstOptionValue(resolvedOpts || []);
       } else {
         init[key] = '';
       }
     });
+
     setForm(init);
     setFieldErrors({});
   }, [isOpen, item, fields]);
 
   if (!isOpen) return null;
 
-  // Reset field con khi field cha thay đổi
   const handleChange = (key, value, field) => {
     setForm((prev) => {
       const next = { ...prev, [key]: value };
@@ -361,12 +362,10 @@ export const AdminModal = ({ isOpen, item, fields, onClose, onSave, saving, apiE
       });
       return next;
     });
-    // Xóa lỗi của field vừa thay đổi
     if (fieldErrors[key]) setFieldErrors(prev => ({ ...prev, [key]: '' }));
   };
 
   const handleSubmit = () => {
-    // Chạy validate cho tất cả field có hàm validate
     const errors = {};
     fields.forEach(({ key, validate }) => {
       if (typeof validate === 'function') {

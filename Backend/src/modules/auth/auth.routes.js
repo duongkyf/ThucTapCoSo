@@ -36,13 +36,16 @@ router.post('/register', registerRules, validate, ctrl.register);
 // POST /api/auth/login
 router.post('/login', loginRules, validate, ctrl.login);
 
-// GET  /api/auth/me      (require login)
+// GET /api/auth/me 
 router.get('/me', authenticate, ctrl.getMe);
 
-// PUT  /api/auth/profile (require login)
+// FIX: frontend calls GET /api/auth/profile 
+router.get('/profile', authenticate, ctrl.getMe);
+
+// PUT /api/auth/profile
 router.put('/profile', authenticate, ctrl.updateProfile);
 
-// PUT  /api/auth/password (require login)
+// PUT /api/auth/password 
 router.put('/password', authenticate, passwordRules, validate, ctrl.changePassword);
 
 module.exports = router;

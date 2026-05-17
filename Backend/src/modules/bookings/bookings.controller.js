@@ -214,7 +214,7 @@ const cancel = async (req, res) => {
 // ── Lookup booking (tra cứu, không thay đổi trạng thái) ───────
 const lookup = async (req, res) => {
   try {
-    const { booking_ref } = req.body;
+    const booking_ref = req.params.ref || req.body?.booking_ref;
     if (!booking_ref)
       return res.status(400).json({ success: false, message: 'Vui lòng nhập mã đặt chỗ' });
 

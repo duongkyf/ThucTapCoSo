@@ -1,13 +1,24 @@
 const { sql, getPool } = require('../../../config/db');
 
+
 // ── Flights ───────────────────────────────────────────────────
 const getFlights = async (req, res) => {
   try {
     const { q, status, from, to, date } = req.query;
-    const pool = await getPool();
+    const pool    = await getPool();
     const request = pool.request();
 
+    const isStaff    = req.user?.role === 'AIRLINE_ADMIN';
+    const airlineId  = req.user?.airline_id;
+
     let where = 'WHERE 1=1';
+
+    // AIRLINE_ADMIN chỉ thấy chuyến bay của hãng mình
+    if (isStaff && airlineId) {
+      request.input('airline_id', sql.Int, airlineId);
+      where += ` AND f.airline_id = @airline_id`;
+    }
+
     if (q) {
       request.input('q', sql.NVarChar, `%${q}%`);
       where += ` AND (f.flight_code LIKE @q OR src.city LIKE @q OR dst.city LIKE @q)`;
@@ -52,41 +63,49 @@ const getFlights = async (req, res) => {
 const createFlight = async (req, res) => {
   try {
     const {
-      flight_code, airline_id, aircraft_id,
+      flight_code, aircraft_id,
       source_airport_id, destination_airport_id,
       departure_time, arrival_time,
       base_price, status
     } = req.body;
 
-    console.log('Body nhận được:', req.body);
+    const isStaff = req.user?.role === 'AIRLINE_ADMIN';
+
+    // AIRLINE_ADMIN chỉ được tạo chuyến bay cho hãng của mình
+    const airline_id = isStaff
+      ? req.user.airline_id
+      : Number(req.body.airline_id);
+
+    if (!airline_id)
+      return res.status(400).json({ success: false, message: 'Thiếu airline_id' });
 
     const pool = await getPool();
 
     const airlineCheck = await pool.request()
-      .input('airline_id', sql.Int, Number(airline_id))
+      .input('airline_id', sql.Int, airline_id)
       .query('SELECT airline_id FROM dbo.Airlines WHERE airline_id = @airline_id');
-
-    if (!airlineCheck.recordset[0]) {
-      return res.status(400).json({
-        success: false,
-        message: `Hãng hàng không ID=${airline_id} không tồn tại`
-      });
-    }
+    if (!airlineCheck.recordset[0])
+      return res.status(400).json({ success: false, message: `Hãng hàng không ID=${airline_id} không tồn tại` });
 
     const aircraftCheck = await pool.request()
       .input('aircraft_id', sql.Int, Number(aircraft_id))
       .query('SELECT aircraft_id FROM dbo.Aircrafts WHERE aircraft_id = @aircraft_id');
+    if (!aircraftCheck.recordset[0])
+      return res.status(400).json({ success: false, message: `Máy bay ID=${aircraft_id} không tồn tại` });
 
-    if (!aircraftCheck.recordset[0]) {
-      return res.status(400).json({
-        success: false,
-        message: `Máy bay ID=${aircraft_id} không tồn tại`
-      });
+    // Nếu là AIRLINE_ADMIN, kiểm tra máy bay có thuộc hãng của mình không
+    if (isStaff) {
+      const ownerCheck = await pool.request()
+        .input('aircraft_id', sql.Int, Number(aircraft_id))
+        .input('airline_id',  sql.Int, airline_id)
+        .query('SELECT aircraft_id FROM dbo.Aircrafts WHERE aircraft_id = @aircraft_id AND airline_id = @airline_id');
+      if (!ownerCheck.recordset[0])
+        return res.status(403).json({ success: false, message: 'Máy bay không thuộc hãng của bạn' });
     }
 
     await pool.request()
       .input('flight_code',            sql.NVarChar, flight_code)
-      .input('airline_id',             sql.Int,      Number(airline_id))
+      .input('airline_id',             sql.Int,      airline_id)
       .input('aircraft_id',            sql.Int,      Number(aircraft_id))
       .input('source_airport_id',      sql.Char,     source_airport_id)
       .input('destination_airport_id', sql.Char,     destination_airport_id)
@@ -112,21 +131,38 @@ const createFlight = async (req, res) => {
 
 const updateFlight = async (req, res) => {
   try {
-    const { flight_code, aircraft_id, source_airport_id, destination_airport_id,
-            departure_time, arrival_time, base_price, status, airline_id, is_recurring } = req.body;
+    const {
+      flight_code, aircraft_id, source_airport_id, destination_airport_id,
+      departure_time, arrival_time, base_price, status, is_recurring
+    } = req.body;
+
+    const isStaff   = req.user?.role === 'AIRLINE_ADMIN';
+    const airline_id = isStaff ? req.user.airline_id : (req.body.airline_id || null);
+
     const pool = await getPool();
+
+    // AIRLINE_ADMIN chỉ được sửa chuyến bay của hãng mình
+    if (isStaff) {
+      const ownerCheck = await pool.request()
+        .input('id',         sql.Int, req.params.id)
+        .input('airline_id', sql.Int, airline_id)
+        .query('SELECT flight_id FROM dbo.Flights WHERE flight_id = @id AND airline_id = @airline_id');
+      if (!ownerCheck.recordset[0])
+        return res.status(403).json({ success: false, message: 'Không có quyền sửa chuyến bay này' });
+    }
+
     await pool.request()
-      .input('id',                    sql.Int,      req.params.id)
-      .input('flight_code',           sql.NVarChar, flight_code)
-      .input('aircraft_id',           sql.Int,      aircraft_id)
-      .input('source_airport_id',     sql.Char,     source_airport_id)
-      .input('destination_airport_id',sql.Char,     destination_airport_id)
-      .input('departure_time',        sql.DateTime, new Date(departure_time))
-      .input('arrival_time',          sql.DateTime, new Date(arrival_time))
-      .input('base_price',            sql.Decimal,  base_price)
-      .input('status',                sql.NVarChar, status)
-      .input('airline_id',            sql.Int,      airline_id || null)
-      .input('is_recurring',          sql.Bit,      is_recurring ? 1 : 0)
+      .input('id',                     sql.Int,      req.params.id)
+      .input('flight_code',            sql.NVarChar, flight_code)
+      .input('aircraft_id',            sql.Int,      aircraft_id)
+      .input('source_airport_id',      sql.Char,     source_airport_id)
+      .input('destination_airport_id', sql.Char,     destination_airport_id)
+      .input('departure_time',         sql.DateTime, new Date(departure_time))
+      .input('arrival_time',           sql.DateTime, new Date(arrival_time))
+      .input('base_price',             sql.Decimal,  base_price)
+      .input('status',                 sql.NVarChar, status)
+      .input('airline_id',             sql.Int,      airline_id)
+      .input('is_recurring',           sql.Bit,      is_recurring ? 1 : 0)
       .query(`
         UPDATE dbo.Flights SET
           flight_code = @flight_code, aircraft_id = @aircraft_id,
@@ -145,7 +181,20 @@ const updateFlight = async (req, res) => {
 
 const deleteFlight = async (req, res) => {
   try {
+    const isStaff   = req.user?.role === 'AIRLINE_ADMIN';
+    const airline_id = req.user?.airline_id;
     const pool = await getPool();
+
+    // AIRLINE_ADMIN chỉ được xóa chuyến bay của hãng mình
+    if (isStaff) {
+      const ownerCheck = await pool.request()
+        .input('id',         sql.Int, req.params.id)
+        .input('airline_id', sql.Int, airline_id)
+        .query('SELECT flight_id FROM dbo.Flights WHERE flight_id = @id AND airline_id = @airline_id');
+      if (!ownerCheck.recordset[0])
+        return res.status(403).json({ success: false, message: 'Không có quyền xóa chuyến bay này' });
+    }
+
     await pool.request()
       .input('id', sql.Int, req.params.id)
       .query(`UPDATE dbo.Flights SET status = 'Cancelled' WHERE flight_id = @id`);

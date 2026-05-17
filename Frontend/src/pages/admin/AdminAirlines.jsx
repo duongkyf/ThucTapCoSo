@@ -3,27 +3,27 @@ import { useAdminCrud, Badge, AdminTable, ActionBtns, AdminModal, SearchBar } fr
 import { adminService } from '../../services/admin.service';
 
 const COUNTRY_OPTIONS = [
-  { value: 'Việt Nam',        label: '🇻🇳 Việt Nam'        },
-  { value: 'Singapore',       label: '🇸🇬 Singapore'       },
-  { value: 'Thái Lan',        label: '🇹🇭 Thái Lan'        },
-  { value: 'Malaysia',        label: '🇲🇾 Malaysia'        },
-  { value: 'Nhật Bản',        label: '🇯🇵 Nhật Bản'        },
-  { value: 'Hàn Quốc',        label: '🇰🇷 Hàn Quốc'        },
-  { value: 'Trung Quốc',      label: '🇨🇳 Trung Quốc'      },
-  { value: 'Hồng Kông',       label: '🇭🇰 Hồng Kông'       },
-  { value: 'Đài Loan',        label: '🇹🇼 Đài Loan'        },
-  { value: 'Indonesia',       label: '🇮🇩 Indonesia'       },
-  { value: 'Philippines',     label: '🇵🇭 Philippines'     },
-  { value: 'Ấn Độ',           label: '🇮🇳 Ấn Độ'           },
-  { value: 'Úc',              label: '🇦🇺 Úc'              },
-  { value: 'Anh',             label: '🇬🇧 Anh'             },
-  { value: 'Pháp',            label: '🇫🇷 Pháp'            },
-  { value: 'Đức',             label: '🇩🇪 Đức'             },
-  { value: 'Mỹ',              label: '🇺🇸 Mỹ'              },
-  { value: 'Canada',          label: '🇨🇦 Canada'          },
-  { value: 'UAE',             label: '🇦🇪 UAE'             },
-  { value: 'Qatar',           label: '🇶🇦 Qatar'           },
-  { value: 'Thổ Nhĩ Kỳ',     label: '🇹🇷 Thổ Nhĩ Kỳ'     },
+  { value: 'Việt Nam',        label: 'Việt Nam'        },
+  { value: 'Singapore',       label: 'Singapore'       },
+  { value: 'Thái Lan',        label: 'Thái Lan'        },
+  { value: 'Malaysia',        label: 'Malaysia'        },
+  { value: 'Nhật Bản',        label: 'Nhật Bản'        },
+  { value: 'Hàn Quốc',        label: 'Hàn Quốc'        },
+  { value: 'Trung Quốc',      label: 'Trung Quốc'      },
+  { value: 'Hồng Kông',       label: 'Hồng Kông'       },
+  { value: 'Đài Loan',        label: 'Đài Loan'        },
+  { value: 'Indonesia',       label: 'Indonesia'       },
+  { value: 'Philippines',     label: 'Philippines'     },
+  { value: 'Ấn Độ',           label: 'Ấn Độ'           },
+  { value: 'Úc',              label: 'Úc'              },
+  { value: 'Anh',             label: 'Anh'             },
+  { value: 'Pháp',            label: 'Pháp'            },
+  { value: 'Đức',             label: 'Đức'             },
+  { value: 'Mỹ',              label: 'Mỹ'              },
+  { value: 'Canada',          label: 'Canada'          },
+  { value: 'UAE',             label: 'UAE'             },
+  { value: 'Qatar',           label: 'Qatar'           },
+  { value: 'Thổ Nhĩ Kỳ',      label: 'Thổ Nhĩ Kỳ'     },
 ];
 
 const FIELDS = [
@@ -75,20 +75,6 @@ const AirlineLogo = ({ logo, code, name }) => {
   );
 };
 
-// ─── TODO (backend) ───────────────────────────────────────────────────────────
-// Thêm total_flights + total_aircrafts vào query lấy airlines:
-//
-//   SELECT a.*,
-//     COUNT(DISTINCT f.flight_id)   AS total_flights,
-//     COUNT(DISTINCT p.aircraft_id) AS total_aircrafts
-//   FROM airlines a
-//   LEFT JOIN flights  f ON f.airline_id = a.airline_id
-//   LEFT JOIN aircraft p ON p.airline_id = a.airline_id
-//   GROUP BY a.airline_id;
-//
-// Khi backend trả đủ 2 field này, cột CHUYẾN BAY và MÁY BAY sẽ tự hiển thị.
-// ─────────────────────────────────────────────────────────────────────────────
-
 const AdminAirlines = () => {
   const { data, loading, modal, saving, apiError, openAdd, openEdit, closeModal, handleSave, handleDelete } =
     useAdminCrud(adminService.airlines, adminService.airlines.getAll, 'airline_id');
@@ -102,9 +88,26 @@ const AdminAirlines = () => {
       ) && (!filter || x.status === filter)
     ), [data, query, filter]);
 
-  // Lấy count từ field backend trả về; hiển thị '—' nếu chưa có
-  const getFlights  = (x) => x.total_flights  ?? '—';
-  const getAircraft = (x) => x.total_aircrafts ?? '—';
+  const getFlights  = (x) => x.flight_count   ?? '—';
+  const getAircraft = (x) => x.aircraft_count  ?? '—';
+
+  // 1. TẠO HÀM BỌC ĐỂ LỌC RÁC & GÁN GIÁ TRỊ MẶC ĐỊNH
+  const handleSaveWrapper = (formData) => {
+    const cleanPayload = {
+      airline_code: formData.airline_code || '',
+      airline_name: formData.airline_name || '',
+      logo_url: formData.logo_url || '',
+      country: (formData.country === 'click' || !formData.country) ? 'Việt Nam' : formData.country,
+      status: (formData.status === 'click' || !formData.status) ? 'active' : formData.status,
+    };
+
+    if (formData.airline_id) {
+      cleanPayload.airline_id = formData.airline_id;
+    }
+
+    console.log("🚀 Payload Hãng Bay SẠCH:", cleanPayload);
+    handleSave(cleanPayload);
+  };
 
   return (
     <div className="panel-card">
@@ -119,7 +122,9 @@ const AdminAirlines = () => {
         query={query} onQuery={setQuery}
         placeholder="Tìm mã IATA, tên hãng, quốc gia..."
         filterVal={filter} filterOptions={FILTER_OPTS} onFilter={setFilter}
-        onAdd={openAdd} addLabel="Thêm hãng bay"
+        // 2. NGĂN EVENT CHUỘT TRUYỀN VÀO OPEN ADD BẰNG ARROW FUNCTION
+        onAdd={() => openAdd({ airline_code: '', airline_name: '', country: 'Việt Nam', logo_url: '', status: 'active' })} 
+        addLabel="Thêm hãng bay"
       />
 
       <AdminTable loading={loading} headers={HEADERS}
@@ -163,7 +168,9 @@ const AdminAirlines = () => {
       <AdminModal
         isOpen={modal.isOpen} item={modal.item} fields={FIELDS}
         title={modal.item ? 'Sửa hãng bay' : 'Thêm hãng bay mới'}
-        onClose={closeModal} onSave={handleSave} saving={saving} apiError={apiError}
+        onClose={closeModal} 
+        onSave={handleSaveWrapper}
+        saving={saving} apiError={apiError}
       />
     </div>
   );

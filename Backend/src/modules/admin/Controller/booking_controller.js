@@ -4,9 +4,24 @@ const { sql, getPool } = require('../../../config/db');
 const getBookings = async (req, res) => {
   try {
     const { q, status } = req.query;
-    const pool = await getPool();
+    const pool    = await getPool();
     const request = pool.request();
+
+    const isStaff   = req.user?.role === 'AIRLINE_ADMIN';
+    const airlineId = req.user?.airline_id;
+
     let where = 'WHERE 1=1';
+
+    // AIRLINE_ADMIN chỉ thấy booking có vé thuộc chuyến bay của hãng mình
+    if (isStaff && airlineId) {
+      request.input('airline_id', sql.Int, airlineId);
+      where += ` AND EXISTS (
+        SELECT 1 FROM dbo.Tickets t2
+        JOIN dbo.Flights f2 ON t2.flight_id = f2.flight_id
+        WHERE t2.booking_id = b.booking_id AND f2.airline_id = @airline_id
+      )`;
+    }
+
     if (q) {
       request.input('q', sql.NVarChar, `%${q}%`);
       where += ` AND (b.booking_ref LIKE @q OR u.username LIKE @q OR u.email LIKE @q OR b.contact_name LIKE @q OR b.contact_email LIKE @q)`;
@@ -15,6 +30,7 @@ const getBookings = async (req, res) => {
       request.input('status', sql.NVarChar, status);
       where += ` AND b.status = @status`;
     }
+
     const result = await request.query(`
       SELECT
         b.booking_id, b.user_id, b.booking_ref, b.booking_date,

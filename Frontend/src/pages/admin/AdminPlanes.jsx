@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAdminCrud, Badge, AdminTable, ActionBtns, AdminModal, STATUS_LABEL } from './AdminShared';
 import { adminService } from '../../services/admin.service';
+import { useAuth } from '../../hooks/useAuth';
 
 const removeVietnameseTones = (str) => {
   if (!str) return '';
@@ -38,6 +39,8 @@ const MANUFACTURER_OPTIONS = [
 const HEADERS = ['MÁY BAY', 'HÃNG BAY', 'NHÀ SẢN XUẤT', 'SỐ GHẾ', 'TRẠNG THÁI', 'HÀNH ĐỘNG'];
 
 const AdminPlanes = () => {
+  const { isAirlineAdmin, airlineId } = useAuth();
+
   const [airlines, setAirlines] = useState([]);
 
   useEffect(() => {
@@ -46,14 +49,12 @@ const AdminPlanes = () => {
       .catch(() => {});
   }, []);
 
-  // FIELDS dùng combobox cho airline (giữ lại tính năng search của bản gốc)
-  // và có validate function cho model_name + total_seats (từ bản mới)
   const FIELDS = useMemo(() => [
-    {
+    ...(!isAirlineAdmin ? [{
       key: 'airline_id', label: 'Hãng hàng không', type: 'combobox',
       placeholder: 'Nhập hoặc chọn hãng bay...',
       options: airlines.map(a => ({ value: a.airline_id, label: a.airline_name })),
-    },
+    }] : []),
     {
       key: 'model_name', label: 'Tên mẫu máy bay', required: true,
       validate: (v) => (!v || !String(v).trim()) ? 'Tên mẫu máy bay không được để trống' : null,
@@ -80,13 +81,17 @@ const AdminPlanes = () => {
         { value: 'Inactive',    label: 'Ngừng hoạt động' },
       ],
     },
-  ], [airlines]);
+  ], [airlines, isAirlineAdmin]);
 
   const { data, loading, modal, saving, apiError,
           openAdd, openEdit, closeModal, handleSave, handleDelete } =
     useAdminCrud(adminService.aircrafts, adminService.aircrafts.getAll, 'aircraft_id');
 
-  // Validate & normalize trước khi gửi lên API
+  // Pre-fill airline_id cho AIRLINE_ADMIN khi mở form thêm mới
+  const handleOpenAdd = () => {
+    openAdd(isAirlineAdmin && airlineId ? { airline_id: airlineId } : undefined);
+  };
+
   const [localError, setLocalError] = useState('');
   const handleSaveValidated = (item) => {
     setLocalError('');
@@ -144,14 +149,17 @@ const AdminPlanes = () => {
               </button>
             )}
           </div>
-          <select className="filter-select" value={filterAirline} onChange={e => setFilterAirline(e.target.value)}>
-            {filterAirlineOpts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
+          {/* AIRLINE_ADMIN không cần filter hãng */}
+          {!isAirlineAdmin && (
+            <select className="filter-select" value={filterAirline} onChange={e => setFilterAirline(e.target.value)}>
+              {filterAirlineOpts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          )}
           <select className="filter-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
             {FILTER_STATUS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </div>
-        <button className="btn-primary" onClick={openAdd}>
+        <button className="btn-primary" onClick={handleOpenAdd}>
           <i className="fas fa-plus" /> Thêm máy bay
         </button>
       </div>

@@ -9,6 +9,7 @@ const authenticate = (req, res, next) => {
     return res.status(401).json({ success: false, message: 'Không có token xác thực' });
 
   try {
+    // decoded sẽ có: { user_id, role, airline_id }
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;
     next();
@@ -28,6 +29,7 @@ const optionalAuth = (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;
   } catch {
+    // token lỗi → bỏ qua, tiếp tục như guest
   }
   next();
 };
